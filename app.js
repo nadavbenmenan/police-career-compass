@@ -127,22 +127,24 @@
     $("btnNext").textContent = (index === total - 1) ? "הצג תוצאות" : "הבא";
   }
 
+  /**
+   * בחירה מסמנת בלבד — המעבר לשאלה הבאה תמיד ידני, דרך כפתור "הבא" (תיקון 2).
+   * בשאלה רב-בחירתית ממילא אי אפשר היה לעבור אוטומטית (אחרת לא ניתן לסמן
+   * אפשרות שנייה), וכאן אותה התנהגות חלה גם על שאלה חד-בחירתית — כדי שהמשתמש
+   * יוכל לשנות את דעתו לפני שהוא ממשיך, ושהקצב יהיה אחיד בכל השאלון.
+   */
   function selectOption(question, optionId) {
     var chosen = selected(question.id);
 
     if (question.multi) {
-      // בחירה מרובה: לחיצה מוסיפה או מסירה, והמעבר לשאלה הבאה ידני —
-      // אחרת אי אפשר לסמן אפשרות שנייה.
       var at = chosen.indexOf(optionId);
       if (at === -1) chosen.push(optionId); else chosen.splice(at, 1);
       state.answers[question.id] = chosen;
-      renderQuestion();
-      return;
+    } else {
+      state.answers[question.id] = [optionId];
     }
 
-    state.answers[question.id] = [optionId];
     renderQuestion();
-    window.setTimeout(goNext, CONFIG.AUTO_ADVANCE_MS);
   }
 
   function goNext() {

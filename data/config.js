@@ -44,9 +44,6 @@ const CONFIG = {
   // מספר הנימוקים המקסימלי לכל תפקיד (§5.6).
   MAX_REASONS: 4,
 
-  // השהיה במילישניות לפני מעבר אוטומטי לשאלה הבאה אחרי בחירה.
-  AUTO_ADVANCE_MS: 260,
-
   // שכבת הסבר AI — כבויה כברירת מחדל. הדגמת GitHub Pages רצה תמיד דטרמיניסטית (§8).
   ENABLE_AI_EXPLANATION: false,
   AI_PROXY_URL: "http://127.0.0.1:5055/api/explain",
