@@ -43,35 +43,23 @@ const QUESTIONS = [
     id: "degree_field", text: "באיזה תחום התואר / הלימודים שלך?",
     showIf: function (profile) { return profile.hasDegree === true || profile.isStudent === true; },
     options: [
-      { id: "life_sci",      label: "מדעי החיים / כימיה / ביולוגיה",   profile: { degreeField: "life_sci" },      scores: { forensics_lab: 3, forensics_scene: 2, forensics_mobile: 1 } },
-      { id: "tech",          label: "מדעי המחשב / הנדסה / סייבר",      profile: { degreeField: "tech" },          scores: { tech_cyber: 3, sigint_audio: 1, net_investigator_105: 1 } },
-      { id: "law",           label: "משפטים",                          profile: { degreeField: "law" },           scores: { investigator: 2, detective: 1 } },
+      { id: "life_sci",      label: "מדעי החיים / כימיה / ביולוגיה",   profile: { degreeField: "life_sci" },      scores: { forensics_lab: 3, forensics_scene: 2, forensics_mobile: 1, admin_medical: 1, admin_food: 1 } },
+      { id: "tech",          label: "מדעי המחשב / סייבר",              profile: { degreeField: "tech" },          scores: { tech_cyber: 3, sigint_audio: 1, net_investigator_105: 1, admin_tech_support: 2 } },
+      { id: "engineering",   label: "הנדסה / אדריכלות",                profile: { degreeField: "engineering" },   scores: { admin_facilities: 3, admin_tech_support: 2, traffic_accident: 2 } },
+      { id: "econ",          label: "כלכלה / מנהל עסקים / ראיית חשבון", profile: { degreeField: "econ" },          scores: { admin_payroll: 3, admin_procurement: 3, investigator: 1 } },
+      { id: "law",           label: "משפטים",                          profile: { degreeField: "law" },           scores: { investigator: 2, detective: 1, admin_legal: 3 } },
       { id: "criminology",   label: "קרימינולוגיה",                    profile: { degreeField: "criminology" },   scores: { investigator: 3, detective: 2, youth_investigator: 1 } },
-      { id: "middle_east",   label: "לימודי המזרח התיכון / ערבית",     profile: { degreeField: "middle_east" },   scores: { arabic_investigator: 2, sigint_audio: 2, detective: 1 } },
-      { id: "social_sci",    label: "מדעי החברה",                      profile: { degreeField: "social_sci" },    scores: { investigator: 2, youth_investigator: 1, admin_welfare: 2, admin_training: 2, student_social_assistant: 1 } },
-      { id: "health_social", label: "בריאות / עבודה סוציאלית",         profile: { degreeField: "health_social" }, scores: { admin_welfare: 3, student_social_assistant: 3, youth_investigator: 1, child_investigator: 1 } },
-      { id: "other",         label: "תחום אחר",                        profile: { degreeField: "other" },         scores: { investigator: 1, dispatcher: 1, admin_office: 1 } }
-    ]
-  },
-  {
-    // אזור מגורים — נאסף לצורך התמונה המלאה. השיבוץ בפועל נקבע במרכז הגיוס,
-    // ולכן אין כאן ניקוד: אין במאגר נתוני פריסה שמצדיקים העדפה גאוגרפית.
-    id: "region", text: "מה אזור המגורים שלך?",
-    hint: "השיבוץ בפועל נקבע במרכז הגיוס. הנתון נאסף לצורך התמונה המלאה בלבד.",
-    options: [
-      { id: "north",     label: "צפון",                  profile: { region: "צפון" },              scores: {} },
-      { id: "haifa",     label: "חיפה והקריות",          profile: { region: "חיפה והקריות" },      scores: {} },
-      { id: "center",    label: "מרכז / שרון",           profile: { region: "מרכז / שרון" },       scores: {} },
-      { id: "tel_aviv",  label: "תל אביב והמטרופולין",   profile: { region: "תל אביב והמטרופולין" }, scores: {} },
-      { id: "jerusalem", label: "ירושלים והסביבה",       profile: { region: "ירושלים והסביבה" },   scores: {} },
-      { id: "south",     label: "דרום",                  profile: { region: "דרום" },              scores: {} },
-      { id: "yosh",      label: "יהודה ושומרון",         profile: { region: "יהודה ושומרון" },     scores: {} }
+      { id: "middle_east",   label: "לימודי המזרח התיכון / ערבית",     profile: { degreeField: "middle_east" },   scores: { arabic_investigator: 2, sigint_audio: 2, detective: 1, admin_media: 1 } },
+      { id: "social_sci",    label: "מדעי החברה",                      profile: { degreeField: "social_sci" },    scores: { investigator: 2, youth_investigator: 1, admin_hr: 3, admin_welfare: 2, admin_training: 2, student_social_assistant: 1 } },
+      { id: "health_social", label: "בריאות / עבודה סוציאלית",         profile: { degreeField: "health_social" }, scores: { admin_welfare: 3, student_social_assistant: 3, admin_medical: 2, youth_investigator: 1, child_investigator: 1 } },
+      { id: "comm",          label: "תקשורת / מדעי הרוח",              profile: { degreeField: "comm" },          scores: { admin_media: 3, admin_training: 1 } },
+      { id: "other",         label: "תחום אחר",                        profile: { degreeField: "other" },         scores: { investigator: 1, dispatcher: 1, admin_hr: 1 } }
     ]
   },
   {
     id: "rifleman", text: "מה רמת הרובאי / הרקע הקרבי שלך?",
     options: [
-      { id: "none", label: "ללא רובאי כלל / פטור על פי חוק",                profile: { rifleman: 0 }, scores: { dispatcher: 2, admin_office: 1, admin_welfare: 1, admin_logistics: 1, admin_training: 1 } },
+      { id: "none", label: "ללא רובאי כלל / פטור על פי חוק",                profile: { rifleman: 0 }, scores: { dispatcher: 2, admin_welfare: 1, admin_hr: 1, admin_payroll: 1, admin_logistics: 1, admin_procurement: 1, admin_training: 1, admin_legal: 1, admin_medical: 1, admin_media: 1, admin_facilities: 1, admin_food: 1, admin_tech_support: 1 } },
       { id: "r02",  label: "רובאי 02",                                      profile: { rifleman: 2 }, scores: { patrol: 1, detective: 1, investigator: 1, dispatcher: 1, traffic_patrol: 1 } },
       { id: "r3",   label: "רובאי 03–04",                                   profile: { rifleman: 4 }, scores: { magav_guard: 2, patrol: 1, detective: 1 } },
       { id: "r5",   label: "רובאי 05–06",                                   profile: { rifleman: 6 }, scores: { spu_yasam: 3, magav_guard: 2, patrol: 1 } },
@@ -85,7 +73,7 @@ const QUESTIONS = [
     multi: true,
     options: [
       { id: "field",   label: "שטח דינמי",                    profile: { wantsField: true },   scores: { patrol: 2, detective: 2, spu_yasam: 2, traffic_patrol: 2, forensics_scene: 2, magav_guard: 2, gideonim: 1, eod: 1 } },
-      { id: "office",  label: "משרד",                         profile: { wantsOffice: true },  scores: { investigator: 2, net_investigator_105: 1, admin_office: 3, admin_logistics: 3, admin_welfare: 2, admin_training: 2, sigint_audio: 1 } },
+      { id: "office",  label: "משרד",                         profile: { wantsOffice: true },  scores: { investigator: 2, net_investigator_105: 1, sigint_audio: 1, admin_welfare: 3, admin_hr: 3, admin_payroll: 3, admin_logistics: 3, admin_procurement: 3, admin_training: 3, admin_legal: 3, admin_medical: 3, admin_media: 3, admin_facilities: 3, admin_food: 3, admin_tech_support: 3 } },
       { id: "lab",     label: "מעבדה",                        profile: { wantsLab: true },     scores: { forensics_lab: 3, forensics_mobile: 2, traffic_accident: 1 } },
       { id: "control", label: "מוקד / סביבה טכנולוגית",       profile: { wantsControl: true }, scores: { dispatcher: 3, net_investigator_105: 2, tech_cyber: 2, sigint_audio: 2 } }
     ]
@@ -96,7 +84,7 @@ const QUESTIONS = [
       { id: "very_high", label: "גבוהה מאוד — אוהב/ת אתגר פיזי",          profile: { fitness: 3 }, scores: { spu_yasam: 3, gideonim: 3, yamam: 3, magav_guard: 2, forensics_mobile: 2, patrol: 1 } },
       { id: "good",      label: "טובה",                                   profile: { fitness: 2 }, scores: { patrol: 2, detective: 2, traffic_patrol: 2, magav_guard: 1, eod: 1 } },
       { id: "medium",    label: "בינונית",                                profile: { fitness: 1 }, scores: { investigator: 1, forensics_scene: 1, dispatcher: 1 } },
-      { id: "low",       label: "מעדיף/ה תפקיד ללא דרישה גופנית",         profile: { fitness: 0 }, scores: { dispatcher: 3, investigator: 2, forensics_lab: 2, sigint_audio: 2, net_investigator_105: 2, admin_office: 2, admin_logistics: 2, admin_welfare: 2, admin_training: 2 } }
+      { id: "low",       label: "מעדיף/ה תפקיד ללא דרישה גופנית",         profile: { fitness: 0 }, scores: { dispatcher: 3, investigator: 2, forensics_lab: 2, sigint_audio: 2, net_investigator_105: 2, admin_welfare: 2, admin_hr: 2, admin_payroll: 2, admin_logistics: 2, admin_procurement: 2, admin_training: 2, admin_legal: 2, admin_medical: 2, admin_media: 2, admin_facilities: 2, admin_food: 2, admin_tech_support: 2 } }
     ]
   },
   {
@@ -104,7 +92,7 @@ const QUESTIONS = [
     options: [
       { id: "nights",   label: "בכיף — כולל לילות",                        scores: { patrol: 2, detective: 2, spu_yasam: 2, dispatcher: 2, magav_guard: 2, traffic_patrol: 1, gideonim: 1 } },
       { id: "no_night", label: "מוכן/ה למשמרות, מעדיף/ה בלי לילה",        scores: { net_investigator_105: 2, dispatcher: 1, traffic_patrol: 1 } },
-      { id: "day",      label: "מעדיף/ה בוקר/צהריים קבוע",                scores: { investigator: 2, forensics_lab: 2, sigint_audio: 2, net_investigator_105: 1, youth_investigator: 1, child_investigator: 1, admin_office: 2, admin_logistics: 2, admin_welfare: 2, admin_training: 2 } }
+      { id: "day",      label: "מעדיף/ה בוקר/צהריים קבוע",                scores: { investigator: 2, forensics_lab: 2, sigint_audio: 2, net_investigator_105: 1, youth_investigator: 1, child_investigator: 1, admin_welfare: 2, admin_hr: 2, admin_payroll: 2, admin_logistics: 2, admin_procurement: 2, admin_training: 2, admin_legal: 2, admin_medical: 2, admin_media: 2, admin_facilities: 2, admin_food: 2, admin_tech_support: 2 } }
     ]
   },
   {
@@ -112,27 +100,58 @@ const QUESTIONS = [
     id: "public", text: "מול מי היית רוצה לעבוד?",
     options: [
       { id: "citizens", label: "מול אזרחים — מגע ישיר ושירות",            profile: { facing: "citizens" }, scores: { patrol: 3, traffic_patrol: 2, youth_investigator: 1, investigator: 1, dispatcher: 1 } },
-      { id: "staff",    label: "מול עובדים אחרים בארגון",                 profile: { facing: "staff" },    scores: { admin_welfare: 3, admin_training: 3, admin_office: 3, admin_logistics: 3, student_social_assistant: 2 } },
-      { id: "backstage",label: "מאחורי הקלעים",                           profile: { facing: "backstage" },scores: { detective: 2, forensics_lab: 2, sigint_audio: 2, tech_cyber: 2, gideonim: 2, net_investigator_105: 1, admin_logistics: 1 } }
+      { id: "staff",    label: "מול עובדים אחרים בארגון",                 profile: { facing: "staff" },    scores: { student_social_assistant: 2, admin_welfare: 3, admin_hr: 3, admin_payroll: 3, admin_logistics: 3, admin_procurement: 3, admin_training: 3, admin_legal: 3, admin_medical: 3, admin_media: 3, admin_facilities: 3, admin_food: 3, admin_tech_support: 3 } },
+      { id: "backstage",label: "מאחורי הקלעים",                           profile: { facing: "backstage" },scores: { detective: 2, forensics_lab: 2, sigint_audio: 2, tech_cyber: 2, gideonim: 2, net_investigator_105: 1 } }
     ]
   },
+  // ── שאלות ערכי-עבודה (מוצגות רק למי שנראה מנהלתי) ──────────────────────
+  // שלוש השאלות הבאות מבוססות על מודלים מקובלים לאבחון ערכי עבודה
+  // (Career Values / WVal), שבהם הנבדק מדרג מה חשוב לו: אלטרואיזם, סדר
+  // ומבנה, התפתחות ולמידה, יצירתיות וביטוי, וניתוח ופתרון בעיות.
+  //
+  // הן נחוצות כי כל תפקידי המנהלה חולקים את אותם אותות חיצוניים — משרד,
+  // ללא דרישה גופנית, שעות יום, מול עובדים. אלה מאפייני המסלול ולא של
+  // תפקיד מסוים, ולכן בלעדיהן כל תפקידי המנהלה קיבלו ניקוד כמעט זהה.
+  // כל אחת מסתכלת מזווית אחרת: מה חשוב לך, עם מה תעבוד, וממה תצא מרוצה.
   {
-    // מבדילה בין תפקידי המנהלה. בלי השאלה הזו כל תפקידי המנהלה קיבלו ניקוד
-    // כמעט זהה — הם חולקים את אותם דגלים (משרד, ללא כושר, מול עובדים) ולכן
-    // דורגו יחד. כאן המועמד בוחר את **מושא העבודה**: אנשים, ידע, ציוד או
-    // תהליכים — וזה מה שקובע בפועל רווחה מול הדרכה מול אמ"ש מול מנהל.
-    id: "admin_style", text: "בעבודה מנהלתית — מה מדבר אליך יותר?",
-    hint: "השאלה עוזרת להבחין בין תפקידי המנהלה השונים.",
+    id: "work_value", text: "מה הכי חשוב לך בעבודה?",
+    hint: "אפשר לבחור יותר מאפשרות אחת — נתייחס למה שהכי מתאים לך.",
+    multi: true,
     showIf: function (profile) {
       return profile.facing === "staff" || profile.fitness === 0 || profile.rifleman === 0;
     },
     options: [
-      // 4 נקודות — זו השאלה שמגדירה את התפקיד, ולכן היא חייבת לגבור על
-      // האותות הגנריים (משרד, ללא כושר, שעות יום) שכל תפקידי המנהלה חולקים.
-      { id: "people",    label: "לדאוג לאנשים — ליווי אישי, סיוע והקשבה",   profile: { adminFocus: "people" },    scores: { admin_welfare: 4, student_social_assistant: 2, admin_training: 1 } },
-      { id: "teaching",  label: "ללמד ולהעביר ידע — הדרכה והכשרה",          profile: { adminFocus: "teaching" },  scores: { admin_training: 4, admin_welfare: 1 } },
-      { id: "equipment", label: "לנהל ציוד, מלאי ותשתיות",                  profile: { adminFocus: "equipment" }, scores: { admin_logistics: 4 } },
-      { id: "process",   label: "לנהל תהליכים, מסמכים וכוח אדם",            profile: { adminFocus: "process" },   scores: { admin_office: 4, admin_logistics: 1 } }
+      { id: "help_people", label: "לעזור לאנשים ולהשפיע על חייהם",        profile: { workValue: "help_people" }, scores: { admin_welfare: 4, admin_medical: 3, student_social_assistant: 2, admin_hr: 1 } },
+      { id: "order",       label: "סדר, דיוק ותהליכים מסודרים",           profile: { workValue: "order" },       scores: { admin_logistics: 3, admin_payroll: 3, admin_procurement: 2, admin_food: 2 } },
+      { id: "learning",    label: "ללמוד, ללמד ולהתפתח מקצועית",          profile: { workValue: "learning" },    scores: { admin_training: 4, admin_hr: 2 } },
+      { id: "creativity",  label: "יצירתיות, כתיבה וביטוי",               profile: { workValue: "creativity" },  scores: { admin_media: 4 } },
+      { id: "analysis",    label: "ניתוח, מספרים ופתרון בעיות",           profile: { workValue: "analysis" },    scores: { admin_payroll: 3, admin_procurement: 3, admin_tech_support: 2, admin_facilities: 1 } }
+    ]
+  },
+  {
+    id: "work_object", text: "עם מה מתחשק לך לעבוד ביום-יום?",
+    showIf: function (profile) {
+      return profile.facing === "staff" || profile.fitness === 0 || profile.rifleman === 0;
+    },
+    options: [
+      { id: "people",    label: "אנשים ושיחות",                    scores: { admin_welfare: 3, admin_hr: 3, admin_training: 2, admin_medical: 2 } },
+      { id: "numbers",   label: "מספרים, תקציבים וחוזים",          scores: { admin_payroll: 4, admin_procurement: 3 } },
+      { id: "equipment", label: "ציוד, מלאי ותשתיות",              scores: { admin_logistics: 4, admin_facilities: 3, admin_food: 2 } },
+      { id: "documents", label: "טקסטים, מסמכים ונהלים",           scores: { admin_legal: 4, admin_media: 2, admin_procurement: 1 } },
+      { id: "systems",   label: "מערכות טכנולוגיות וציוד תקשורת",  scores: { admin_tech_support: 4, admin_payroll: 1 } }
+    ]
+  },
+  {
+    id: "work_reward", text: "מה ייתן לך הכי הרבה סיפוק בסוף יום עבודה?",
+    showIf: function (profile) {
+      return profile.facing === "staff" || profile.fitness === 0 || profile.rifleman === 0;
+    },
+    options: [
+      { id: "helped",     label: "\"עזרתי למישהו שהיה צריך אותי\"",          scores: { admin_welfare: 3, admin_medical: 3, student_social_assistant: 2 } },
+      { id: "unblocked",  label: "\"סגרתי תהליך שהיה תקוע\"",                scores: { admin_procurement: 3, admin_payroll: 2, admin_hr: 2, admin_legal: 2 } },
+      { id: "taught",     label: "\"לימדתי מישהו משהו חדש\"",                scores: { admin_training: 4 } },
+      { id: "ran_smooth", label: "\"הכול עבד חלק כי דאגתי שיהיה\"",          scores: { admin_logistics: 3, admin_facilities: 3, admin_food: 3, admin_tech_support: 2 } },
+      { id: "created",    label: "\"יצרתי משהו שאנשים ראו\"",                scores: { admin_media: 4 } }
     ]
   },
   {
@@ -140,7 +159,7 @@ const QUESTIONS = [
     options: [
       { id: "high", label: "מאוד — אוהב/ת לפצח ולחקור", profile: { investigative: true }, scores: { investigator: 3, detective: 2, forensics_scene: 2, youth_investigator: 2, child_investigator: 2, traffic_accident: 2, net_investigator_105: 2, forensics_lab: 1, arabic_investigator: 1 } },
       { id: "mid",  label: "בינוני",                                     scores: { investigator: 1, detective: 1 } },
-      { id: "low",  label: "פחות — מעדיף/ה פעולה ישירה",                 scores: { patrol: 1, spu_yasam: 1, magav_guard: 1, dispatcher: 1, admin_logistics: 1 } }
+      { id: "low",  label: "פחות — מעדיף/ה פעולה ישירה",                 scores: { patrol: 1, spu_yasam: 1, magav_guard: 1, dispatcher: 1 } }
     ]
   },
   {
@@ -148,7 +167,7 @@ const QUESTIONS = [
     options: [
       { id: "high", label: "גבוהה — מתמודד/ת היטב",   profile: { resilience: 3 }, scores: { forensics_scene: 3, forensics_mobile: 3, eod: 2, child_investigator: 2, traffic_accident: 2, youth_investigator: 1, detective: 1, spu_yasam: 1 } },
       { id: "mid",  label: "בינונית",                 profile: { resilience: 2 }, scores: { patrol: 1, investigator: 1, dispatcher: 1 } },
-      { id: "low",  label: "מעדיף/ה חשיפה נמוכה",     profile: { resilience: 1 }, scores: { dispatcher: 1, admin_office: 2, admin_logistics: 2, admin_welfare: 1, admin_training: 2 } }
+      { id: "low",  label: "מעדיף/ה חשיפה נמוכה",     profile: { resilience: 1 }, scores: { dispatcher: 1, admin_welfare: 2, admin_hr: 2, admin_payroll: 2, admin_logistics: 2, admin_procurement: 2, admin_training: 2, admin_legal: 2, admin_medical: 2, admin_media: 2, admin_facilities: 2, admin_food: 2, admin_tech_support: 2 } }
     ]
   },
   {
@@ -174,8 +193,8 @@ const QUESTIONS = [
     id: "tech_affinity", text: "מה הזיקה שלך לעולם הטכנולוגי / סייבר?",
     options: [
       { id: "high", label: "גבוהה",   profile: { techAffinity: 3 }, scores: { tech_cyber: 3, sigint_audio: 2, net_investigator_105: 2, dispatcher: 1, forensics_lab: 1 } },
-      { id: "mid",  label: "בינונית", profile: { techAffinity: 2 }, scores: { dispatcher: 1, traffic_accident: 1, admin_office: 1 } },
-      { id: "low",  label: "נמוכה",   profile: { techAffinity: 1 }, scores: { patrol: 1, magav_guard: 1, admin_logistics: 1 } }
+      { id: "mid",  label: "בינונית", profile: { techAffinity: 2 }, scores: { dispatcher: 1, traffic_accident: 1 } },
+      { id: "low",  label: "נמוכה",   profile: { techAffinity: 1 }, scores: { patrol: 1, magav_guard: 1 } }
     ]
   },
   {
@@ -197,8 +216,8 @@ const QUESTIONS = [
     id: "teamwork", text: "עבודת צוות או עבודה עצמאית?",
     options: [
       { id: "team", label: "צוות אורגני הדוק",                            scores: { spu_yasam: 2, gideonim: 2, yamam: 2, magav_guard: 2, eod: 1, patrol: 1 } },
-      { id: "mix",  label: "שילוב",                                       scores: { detective: 1, investigator: 1, patrol: 1, traffic_patrol: 1, admin_training: 1, admin_welfare: 1 } },
-      { id: "solo", label: "עצמאי/ת",                                     scores: { investigator: 1, forensics_lab: 1, sigint_audio: 1, detective: 1, admin_office: 1, admin_logistics: 1 } }
+      { id: "mix",  label: "שילוב",                                       scores: { detective: 1, investigator: 1, patrol: 1, traffic_patrol: 1 } },
+      { id: "solo", label: "עצמאי/ת",                                     scores: { investigator: 1, forensics_lab: 1, sigint_audio: 1, detective: 1 } }
     ]
   },
   {
@@ -212,7 +231,7 @@ const QUESTIONS = [
     options: [
       { id: "high", label: "גבוהה",                                       profile: { risk: 2 }, scores: { spu_yasam: 3, yamam: 3, gideonim: 3, magav_guard: 2, eod: 2, detective: 1 } },
       { id: "mid",  label: "בינונית",                                     profile: { risk: 1 }, scores: { patrol: 1, traffic_patrol: 1, detective: 1 } },
-      { id: "low",  label: "נמוכה — מעדיף/ה סיכון נמוך",                  profile: { risk: 0 }, scores: { dispatcher: 2, investigator: 2, forensics_lab: 2, sigint_audio: 2, net_investigator_105: 2, youth_investigator: 1, child_investigator: 1, admin_office: 2, admin_logistics: 2, admin_welfare: 2, admin_training: 2 } }
+      { id: "low",  label: "נמוכה — מעדיף/ה סיכון נמוך",                  profile: { risk: 0 }, scores: { dispatcher: 2, investigator: 2, forensics_lab: 2, sigint_audio: 2, net_investigator_105: 2, youth_investigator: 1, child_investigator: 1 } }
     ]
   },
   {
@@ -220,16 +239,16 @@ const QUESTIONS = [
     options: [
       { id: "18_24", label: "18–24", profile: { ageBand: "18_24" }, scores: { patrol: 1, spu_yasam: 1, gideonim: 1, student: 1, magav_guard: 1 } },
       { id: "25_34", label: "25–34", profile: { ageBand: "25_34" }, scores: { detective: 1, investigator: 1, forensics_scene: 1, tech_cyber: 1 } },
-      { id: "35_44", label: "35–44", profile: { ageBand: "35_44" }, scores: { traffic_patrol: 2, investigator: 1, forensics_lab: 1, eod: 1, admin_office: 1 } },
-      { id: "45_plus", label: "45+ / לקראת פרישה או גמלאי/ת", profile: { ageBand: "45_plus" }, scores: { traffic_patrol: 3, dispatcher: 1, admin_logistics: 1, admin_office: 1 } }
+      { id: "35_44", label: "35–44", profile: { ageBand: "35_44" }, scores: { traffic_patrol: 2, investigator: 1, forensics_lab: 1, eod: 1 } },
+      { id: "45_plus", label: "45+ / לקראת פרישה או גמלאי/ת", profile: { ageBand: "45_plus" }, scores: { traffic_patrol: 3, dispatcher: 1 } }
     ]
   },
   {
     id: "commitment", text: "מה תפיסת הקריירה שלך?",
     options: [
-      { id: "long",    label: "קריירה ארוכת טווח בקבע",                   scores: { patrol: 1, detective: 1, investigator: 1, spu_yasam: 1, eod: 1, forensics_lab: 1, admin_office: 1 } },
+      { id: "long",    label: "קריירה ארוכת טווח בקבע",                   scores: { patrol: 1, detective: 1, investigator: 1, spu_yasam: 1, eod: 1, forensics_lab: 1 } },
       { id: "studies", label: "שילוב עם לימודים (סטודנט)",                scores: { student: 3, student_social_assistant: 2, dispatcher: 1 } },
-      { id: "flex",    label: "שלב ביניים / גמיש",                        scores: { traffic_patrol: 1, dispatcher: 1, admin_logistics: 1, admin_office: 1 } }
+      { id: "flex",    label: "שלב ביניים / גמיש",                        scores: { traffic_patrol: 1, dispatcher: 1 } }
     ]
   }
 ];

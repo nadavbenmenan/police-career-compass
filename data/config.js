@@ -25,8 +25,9 @@ const CONFIG = {
   // השלמה ל-3 המלצות כשאין מספיק מועמדים ("תמיד ממליץ", §5.5). לכולם gates ריק.
   FALLBACK_ROLE_IDS: ["patrol", "dispatcher", "detective", "investigator", "traffic_patrol"],
 
-  // השלמה מקבילה למי שנותב למסלול המנהלה.
-  ADMIN_FALLBACK_ROLE_IDS: ["admin_office", "admin_logistics", "admin_welfare", "admin_training"],
+  // השלמה מקבילה למי שנותב למסלול המנהלה. חייבים להיות חסרי-שער:
+  // רווחה, רכש ומשפט דורשים תואר ולכן אינם יכולים לשמש כברירת מחדל.
+  ADMIN_FALLBACK_ROLE_IDS: ["admin_hr", "admin_logistics", "admin_training", "admin_media"],
 
   // כמה משלוש המשבצות שמורות לתפקידי ליבה (תיקון 1: "בעיקר תפקידי ליבה").
   // 2 מתוך 3 — המשבצת השלישית נשארת פתוחה להתמחות שבאמת התאימה.

@@ -200,7 +200,6 @@
 
     renderAlsoFit(results.alsoFit);
     renderBlocked(results.blocked);
-    renderProfileNote(results.profile);
   }
 
   /** תפקידים ייחודיים שהתאימו אך לא נכנסו לשלישייה — כדי לא להסתיר מידע. */
@@ -243,19 +242,6 @@
     host.appendChild(box);
   }
 
-  /** אזור המגורים נאסף אך אינו משפיע על הדירוג — נאמר את זה במפורש. */
-  function renderProfileNote(profile) {
-    var host = $("profileNote");
-    host.innerHTML = "";
-    if (!profile || !profile.region) return;
-
-    var p = document.createElement("p");
-    p.className = "profile-note";
-    p.textContent = "אזור המגורים שציינת: " + profile.region +
-      " — השיבוץ בפועל ומיקום היחידה נקבעים בתהליך המיון במרכז הגיוס.";
-    host.appendChild(p);
-  }
-
   // ── כרטיס תפקיד ─────────────────────────────────────────────────────────
 
   function buildRoleCard(role, options) {
@@ -273,10 +259,11 @@
               "<h3>" + esc(role.name) + "</h3>" +
               '<span class="tag">' + esc(role.category) + "</span>";
 
-    // תג שמבדיל תפקיד שנוסף מחוץ למאגר הרשמי מתפקיד שכל עובדותיו מהמאגר.
-    if (role.source === "added") {
-      html += '<span class="tag tag-added" title="תפקיד זה אינו חלק ממאגר השאלות הרשמי; פרטיו המלאים נמסרים במרכז הגיוס">' +
-              "מידע מלא נמסר במרכז הגיוס</span>";
+    // תג שמבדיל תפקיד שמקורו בדף התפקידים הרשמי — שם מתפרסמים תיאור
+    // ודרישות אך לא שכר, הכשרה והתקדמות — מתפקיד שכל עובדותיו במאגר.
+    if (role.source !== "kb") {
+      html += '<span class="tag tag-added" title="התיאור והדרישות מדף התפקידים הרשמי. נתוני שכר, הכשרה והתקדמות אינם מתפרסמים שם ונמסרים במרכז הגיוס">' +
+              "שכר והכשרה — נמסרים במרכז הגיוס</span>";
     }
 
     if (options.rank) {

@@ -479,7 +479,7 @@ function runSanityChecks() {
 
   // ── פרופילים ──
   const low = asAnswers({
-    status: "civilian", region: "center", rifleman: "r02", environment: "office",
+    status: "civilian", rifleman: "r02", environment: "office",
     fitness: "medium", shifts: "day", public: "backstage", curiosity: "low",
     resilience: "low", youth: "no", arabic: "none_open", tech_affinity: "low",
     patience: "low", teamwork: "solo", risk: "low", age: "45_plus", commitment: "flex"
@@ -491,7 +491,7 @@ function runSanityChecks() {
   // ── בחירה מרובה: סטודנט שהוא גם קצין לשעבר ──
   const both = asAnswers({
     status: ["student", "ex_officer"], study_left: "year_plus", degree_field: "other",
-    region: "center", rifleman: "r7", environment: ["office", "field"], fitness: "good",
+    rifleman: "r7", environment: ["office", "field"], fitness: "good",
     shifts: "day", public: "citizens", curiosity: "high", resilience: "high",
     youth: "open", arabic: "none_open", tech_affinity: "mid", patience: "mid",
     teamwork: "mix", risk: "mid", age: "25_34", commitment: "studies"
@@ -506,7 +506,7 @@ function runSanityChecks() {
 
   // ── יתרת לימודים ──
   const shortStudy = asAnswers(Object.assign({}, { status: "student", study_left: "less_year",
-    degree_field: "other", region: "center", rifleman: "r02", environment: "office",
+    degree_field: "other", rifleman: "r02", environment: "office",
     fitness: "medium", shifts: "day", public: "citizens", curiosity: "mid",
     resilience: "mid", youth: "open", arabic: "none_open", tech_affinity: "mid",
     patience: "mid", teamwork: "mix", risk: "mid", age: "18_24", commitment: "studies" }));
@@ -514,7 +514,7 @@ function runSanityChecks() {
   check("סטודנט עם פחות משנה — תקן הסטודנט חסום",
         shortRes.all.find(e => e.id === "student").passedGates === false);
   const longStudy = asAnswers(Object.assign({}, JSON.parse(JSON.stringify({})), {
-    status: ["student"], study_left: ["year_plus"], degree_field: ["other"], region: ["center"],
+    status: ["student"], study_left: ["year_plus"], degree_field: ["other"],
     rifleman: ["r02"], environment: ["office"], fitness: ["medium"], shifts: ["day"],
     public: ["citizens"], curiosity: ["mid"], resilience: ["mid"], youth: ["open"],
     arabic: ["none_open"], tech_affinity: ["mid"], patience: ["mid"], teamwork: ["mix"],
@@ -537,7 +537,7 @@ function runSanityChecks() {
 
   // ── מז"פ וחוסן נפשי (הבאג מהסימולציה) ──
   const softDegree = asAnswers({
-    status: "graduate", degree_field: "life_sci", region: "center", rifleman: "r02",
+    status: "graduate", degree_field: "life_sci", rifleman: "r02",
     environment: "lab", fitness: "low", shifts: "day", public: "backstage",
     curiosity: "high", resilience: "low", youth: "no", arabic: "none_open",
     tech_affinity: "mid", patience: "mid", teamwork: "solo", risk: "low",
@@ -552,7 +552,7 @@ function runSanityChecks() {
         mazapIds.every(id => softRes.all.find(e => e.id === id).passedGates === false));
 
   // ── ערבית: לא מעוניין ללמוד ──
-  const noArabic = asAnswers(Object.assign({}, { status: "civilian", region: "center",
+  const noArabic = asAnswers(Object.assign({}, { status: "civilian",
     rifleman: "r02", environment: "office", fitness: "medium", shifts: "day",
     public: "citizens", curiosity: "high", resilience: "mid", youth: "no",
     arabic: "none_no", tech_affinity: "mid", patience: "mid", teamwork: "mix",
@@ -562,7 +562,7 @@ function runSanityChecks() {
 
   // ── ניתוב למנהלה ──
   const adminAnswers = asAnswers({
-    status: "civilian", region: "center", rifleman: "none", environment: "office",
+    status: "civilian", rifleman: "none", environment: "office",
     fitness: "low", shifts: "day", public: "staff", curiosity: "mid",
     resilience: "low", youth: "no", arabic: "none_no", tech_affinity: "mid",
     patience: "mid", teamwork: "solo", risk: "low", age: "35_44", commitment: "long"
@@ -578,7 +578,7 @@ function runSanityChecks() {
 
   // ── דומיננטיות הליבה ──
   const eliteAnswers = asAnswers({
-    status: "civilian", region: "center", rifleman: "r7", environment: "field",
+    status: "civilian", rifleman: "r7", environment: "field",
     fitness: "very_high", shifts: "nights", public: "backstage", curiosity: "low",
     resilience: "high", youth: "no", arabic: "none_open", tech_affinity: "low",
     patience: "high", teamwork: "team", risk: "high", age: "18_24", commitment: "long"
@@ -593,7 +593,7 @@ function runSanityChecks() {
 
   // ── שאלות מבצעיות לא נשאלות ממי שלא רוצה שטח ──
   const deskOnly = asAnswers({
-    status: "civilian", region: "center", rifleman: "none", environment: "office",
+    status: "civilian", rifleman: "none", environment: "office",
     fitness: "low", shifts: "day", public: "staff", curiosity: "mid", resilience: "low"
   });
   const deskVisible = visibleQuestions(deskOnly).map(q => q.id);
@@ -601,8 +601,8 @@ function runSanityChecks() {
         deskVisible.indexOf("risk") === -1);
   check("ללא שטח — לא נשאלת שאלת התצפיות והמעקבים",
         deskVisible.indexOf("patience") === -1);
-  check("ללא שטח — מוצגת שאלת אופי העבודה המנהלתית",
-        deskVisible.indexOf("admin_style") !== -1);
+  check("ללא שטח — מוצגות שאלות ערכי-העבודה המנהלתיות",
+        ["work_value", "work_object", "work_reward"].every(id => deskVisible.indexOf(id) !== -1));
 
   const fieldWanted = asAnswers({ status: "civilian", rifleman: "r02", environment: "field", fitness: "good" });
   const fieldVisible = visibleQuestions(fieldWanted).map(q => q.id);
@@ -622,25 +622,45 @@ function runSanityChecks() {
   check("נטייה חקירתית לא מחזירה את שאלת הסיכון המבצעי",
         curiousVisible.indexOf("risk") === -1);
 
-  // ── תפקידי המנהלה נבדלים זה מזה ──
+  // ── שאלות ערכי-העבודה מפרידות בין תפקידי המנהלה ──
+  // כל שילוב של ערך + מושא עבודה + מקור סיפוק אמור להוביל לתפקיד אחר.
+  // בלי השאלות האלה כל תפקידי המנהלה קיבלו ניקוד כמעט זהה.
   const adminBase = {
-    status: "civilian", region: "center", rifleman: "none", environment: "office",
+    status: "civilian", rifleman: "none", environment: "office",
     fitness: "low", shifts: "day", public: "staff", curiosity: "mid",
     resilience: "low", youth: "no", arabic: "none_no", tech_affinity: "mid",
     teamwork: "mix", age: "35_44", commitment: "long"
   };
-  const expectedTop = {
-    people: "admin_welfare", teaching: "admin_training",
-    equipment: "admin_logistics", process: "admin_office"
-  };
+  const adminCases = [
+    { name: "רווחה",     answers: { work_value: "help_people", work_object: "people",    work_reward: "helped" },     expect: "admin_welfare",       degree: "health_social" },
+    { name: "הדרכה",     answers: { work_value: "learning",    work_object: "people",    work_reward: "taught" },     expect: "admin_training" },
+    { name: "לוגיסטיקה", answers: { work_value: "order",       work_object: "equipment", work_reward: "ran_smooth" }, expect: "admin_logistics" },
+    { name: "שכר",       answers: { work_value: "analysis",    work_object: "numbers",   work_reward: "unblocked" },  expect: "admin_payroll" },
+    { name: "מדיה",      answers: { work_value: "creativity",  work_object: "documents", work_reward: "created" },    expect: "admin_media" },
+    { name: "תקשוב",     answers: { work_value: "analysis",    work_object: "systems",   work_reward: "ran_smooth" }, expect: "admin_tech_support" }
+  ];
   const wrong = [];
-  Object.keys(expectedTop).forEach(style => {
-    const res = computeResults(asAnswers(Object.assign({}, adminBase, { admin_style: style })));
-    if (res.top3[0].id !== expectedTop[style]) {
-      wrong.push(style + " → " + res.top3[0].id + " (צפוי " + expectedTop[style] + ")");
+  adminCases.forEach(c => {
+    const merged = Object.assign({}, adminBase, c.answers);
+    if (c.degree) { merged.status = ["civilian", "graduate"]; merged.degree_field = c.degree; }
+    const res = computeResults(asAnswers(merged));
+    if (res.top3[0].id !== c.expect) {
+      wrong.push(c.name + " → " + res.top3[0].id + " (צפוי " + c.expect + ")");
     }
   });
-  check("כל אופי מנהלתי מוביל לתפקיד המנהלה הנכון", wrong.length === 0, wrong.join("; "));
+  check("ערכי-העבודה מפרידים נכון בין תפקידי המנהלה", wrong.length === 0, wrong.join("; "));
+
+  // שאלות ערכי-העבודה לא מוצגות למי שאינו מנהלתי.
+  const fieldOnly = visibleQuestions(asAnswers({
+    status: "civilian", rifleman: "r5", environment: "field", fitness: "very_high", public: "citizens"
+  })).map(q => q.id);
+  check("פרופיל שטח — שאלות ערכי-העבודה לא מוצגות",
+        ["work_value", "work_object", "work_reward"].every(id => fieldOnly.indexOf(id) === -1));
+
+  // כל התפקידים שמקורם באתר הרשמי חייבים דרישות אמיתיות ולא שדות ריקים.
+  const siteNoReq = ROLES.filter(r => r.source === "site" &&
+    (!r.requirements || r.requirements.length === 0)).map(r => r.id);
+  check("לכל תפקיד מהאתר הרשמי יש דרישות", siteNoReq.length === 0, siteNoReq.join(", "));
 
   // ── תקינות כללית ──
   const badPct = lowRes.all.filter(e => e.matchPct < 0 || e.matchPct > 100).map(e => e.id);
@@ -651,9 +671,9 @@ function runSanityChecks() {
   const unrankable = ROLES.filter(r => (fullMax[r.id] || 0) < rankThreshold(fullMax[r.id] || 0)).map(r => r.id);
   check("כל תפקיד ניתן להמלצה בשילוב תשובות כלשהו", unrankable.length === 0, unrankable.join(", "));
 
-  const addedWithFacts = ROLES.filter(r => r.source === "added" &&
+  const addedWithFacts = ROLES.filter(r => r.source !== "kb" &&
     (r.salary != null || r.training != null || r.advancement != null)).map(r => r.id);
-  check("לתפקידים שנוספו אין נתוני שכר/הכשרה מומצאים",
+  check("לתפקידים שמחוץ למאגר אין נתוני שכר/הכשרה מומצאים",
         addedWithFacts.length === 0, addedWithFacts.join(", "));
 
   return results;
