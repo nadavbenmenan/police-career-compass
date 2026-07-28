@@ -83,6 +83,7 @@
 
       <div class="question-card">
         <h2 id="questionText"></h2>
+        <p class="question-hint" id="questionHint" hidden></p>
         <div class="options" id="optionsList" role="radiogroup" aria-labelledby="questionText"></div>
       </div>
 
@@ -96,11 +97,13 @@
     <section class="screen" id="screen-results" aria-labelledby="resultsTitle">
       <div class="section-head">
         <h2 id="resultsTitle">3 התפקידים שהכי מתאימים לך</h2>
-        <p>הדירוג מחושב מהתשובות שלך בלבד. לחיצה על "קרא/י עוד" תפתח את התיאור המלא.</p>
+        <p id="resultsLead">הדירוג מחושב מהתשובות שלך בלבד. לחיצה על "קרא/י עוד" תפתח את התיאור המלא.</p>
       </div>
 
       <div id="topRoles" aria-live="polite"></div>
+      <div id="alsoFitBlock"></div>
       <div id="blockedBlock"></div>
+      <div id="profileNote"></div>
 
       <div class="results-actions">
         <button class="btn-next" id="btnCatalogFromResults" type="button">כל התפקידים</button>

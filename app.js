@@ -3,6 +3,11 @@
 
    האפליקציה לא מחשבת כאן שום דבר: החישוב כולו ב-scoring.js, והעובדות כולן
    ב-data/roles.js. הקובץ הזה רק מציג. מצב נשמר בזיכרון בלבד.
+
+   שתי נקודות שמשפיעות על כל הזרימה (תיקון 1):
+     • תשובה היא תמיד מערך, גם בשאלת בחירה יחידה.
+     • רשימת השאלות דינמית — שאלות מותנות נכנסות ויוצאות לפי התשובות,
+       ולכן אין להחזיק אינדקס לתוך QUESTIONS אלא לנווט לפי מזהה שאלה.
    --------------------------------------------------------------------------- */
 
 (function () {
@@ -11,18 +16,17 @@
   // ── מצב ─────────────────────────────────────────────────────────────────
 
   var state = {
-    index: 0,            // אינדקס השאלה הנוכחית
-    answers: {},         // { questionId: optionId }
-    results: null,       // תוצאת computeResults האחרונה
+    questionId: null,    // מזהה השאלה המוצגת (לא אינדקס — הרשימה דינמית)
+    answers: {},         // { questionId: [optionId, ...] }
+    results: null,
     catalogFilter: "all",
-    returnScreen: "welcome" // לאן חוזרים מהקטלוג
+    returnScreen: "welcome"
   };
 
   // ── עזרים ───────────────────────────────────────────────────────────────
 
   function $(id) { return document.getElementById(id); }
 
-  /** הכל שמגיע מה-KB עובר כאן לפני שהוא נכנס ל-HTML. */
   function esc(str) {
     return String(str == null ? "" : str)
       .replace(/&/g, "&amp;")
@@ -42,15 +46,47 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  /** התשובות שנבחרו בשאלה, תמיד כמערך. */
+  function selected(questionId) {
+    var value = state.answers[questionId];
+    if (value == null) return [];
+    return Array.isArray(value) ? value : [value];
+  }
+
   // ── מסך השאלון ──────────────────────────────────────────────────────────
 
-  function renderQuestion() {
-    var question = QUESTIONS[state.index];
-    var total = QUESTIONS.length;
-    var answeredCount = state.index;
-    var pct = Math.round((answeredCount / total) * 100);
+  /**
+   * רשימת השאלות הרלוונטיות כרגע. מחושבת מחדש בכל רינדור, כי סימון
+   * "יש לי תואר" יכול להוסיף שאלה באמצע השאלון, וביטול הסימון להסיר אותה.
+   */
+  function activeQuestions() {
+    return visibleQuestions(state.answers);
+  }
 
-    $("progressLabel").textContent = "שאלה " + (state.index + 1) + " מתוך " + total;
+  function currentIndex(list) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === state.questionId) return i;
+    }
+    return -1;
+  }
+
+  function renderQuestion() {
+    var list = activeQuestions();
+    var index = currentIndex(list);
+
+    // השאלה הנוכחית כבר לא רלוונטית (שינוי תשובה קודמת הסיר אותה) —
+    // עוברים לשאלה הבאה שטרם נענתה.
+    if (index === -1) {
+      var next = list.find(function (q) { return selected(q.id).length === 0; }) || list[list.length - 1];
+      state.questionId = next.id;
+      index = currentIndex(list);
+    }
+
+    var question = list[index];
+    var total = list.length;
+    var pct = Math.round((index / total) * 100);
+
+    $("progressLabel").textContent = "שאלה " + (index + 1) + " מתוך " + total;
     $("progressPct").textContent = pct + "%";
     var fill = $("progressFill");
     fill.style.width = pct + "%";
@@ -58,42 +94,65 @@
 
     $("questionText").textContent = question.text;
 
-    var list = $("optionsList");
-    list.innerHTML = "";
+    var hint = $("questionHint");
+    if (question.hint) {
+      hint.textContent = question.hint;
+      hint.hidden = false;
+    } else {
+      hint.hidden = true;
+    }
+
+    var host = $("optionsList");
+    host.innerHTML = "";
+    host.setAttribute("role", question.multi ? "group" : "radiogroup");
+
+    var chosen = selected(question.id);
 
     question.options.forEach(function (option) {
-      var isSelected = state.answers[question.id] === option.id;
+      var isSelected = chosen.indexOf(option.id) !== -1;
 
       var btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "option" + (isSelected ? " is-selected" : "");
-      btn.setAttribute("role", "radio");
+      btn.className = "option" + (isSelected ? " is-selected" : "") + (question.multi ? " is-multi" : "");
+      btn.setAttribute("role", question.multi ? "checkbox" : "radio");
       btn.setAttribute("aria-checked", isSelected ? "true" : "false");
       btn.innerHTML = '<span class="option-dot" aria-hidden="true"></span><span>' + esc(option.label) + "</span>";
 
-      btn.addEventListener("click", function () { selectOption(question.id, option.id); });
-      list.appendChild(btn);
+      btn.addEventListener("click", function () { selectOption(question, option.id); });
+      host.appendChild(btn);
     });
 
-    $("btnBack").disabled = (state.index === 0);
-    $("btnNext").disabled = (state.answers[question.id] == null);
-    $("btnNext").textContent = (state.index === total - 1) ? "הצג תוצאות" : "הבא";
+    $("btnBack").disabled = (index === 0);
+    $("btnNext").disabled = (chosen.length === 0);
+    $("btnNext").textContent = (index === total - 1) ? "הצג תוצאות" : "הבא";
   }
 
-  function selectOption(questionId, optionId) {
-    state.answers[questionId] = optionId;
-    renderQuestion();
+  function selectOption(question, optionId) {
+    var chosen = selected(question.id);
 
-    // מעבר אוטומטי קדימה — עם השהיה קצרה, כדי שהבחירה תיראה לפני המעבר.
+    if (question.multi) {
+      // בחירה מרובה: לחיצה מוסיפה או מסירה, והמעבר לשאלה הבאה ידני —
+      // אחרת אי אפשר לסמן אפשרות שנייה.
+      var at = chosen.indexOf(optionId);
+      if (at === -1) chosen.push(optionId); else chosen.splice(at, 1);
+      state.answers[question.id] = chosen;
+      renderQuestion();
+      return;
+    }
+
+    state.answers[question.id] = [optionId];
+    renderQuestion();
     window.setTimeout(goNext, CONFIG.AUTO_ADVANCE_MS);
   }
 
   function goNext() {
-    var question = QUESTIONS[state.index];
-    if (state.answers[question.id] == null) return;
+    var list = activeQuestions();
+    var index = currentIndex(list);
+    if (index === -1) return;
+    if (selected(list[index].id).length === 0) return;
 
-    if (state.index < QUESTIONS.length - 1) {
-      state.index += 1;
+    if (index < list.length - 1) {
+      state.questionId = list[index + 1].id;
       renderQuestion();
     } else {
       finish();
@@ -101,8 +160,10 @@
   }
 
   function goBack() {
-    if (state.index === 0) return;
-    state.index -= 1;
+    var list = activeQuestions();
+    var index = currentIndex(list);
+    if (index <= 0) return;
+    state.questionId = list[index - 1].id;
     renderQuestion();
   }
 
@@ -110,19 +171,24 @@
 
   function finish() {
     state.results = computeResults(state.answers);
-
     $("progressFill").style.width = "100%";
     renderResults(state.results);
     showScreen("results");
-
-    // שכבת הסבר ה-AI היא קישוט בלבד: הדירוג והאחוזים כבר נקבעו ומוצגים.
     if (CONFIG.ENABLE_AI_EXPLANATION) enhanceWithAI(state.results);
   }
 
   function renderResults(results) {
+    // כותרת שמסבירה לאיזה מסלול נותב המועמד — בלי הפתעות.
+    $("resultsTitle").textContent = results.track === "admin"
+      ? "3 התפקידים שהכי מתאימים לך"
+      : "3 התפקידים שהכי מתאימים לך";
+
+    $("resultsLead").textContent = results.track === "admin"
+      ? "לפי התשובות שלך, תפקידי השטח פחות מתאימים כרגע — ולכן ההמלצות מתמקדות בתפקידי מנהלה ותומכי לחימה."
+      : "הדירוג מחושב מהתשובות שלך בלבד. לחיצה על \"קרא/י עוד\" תפתח את התיאור המלא.";
+
     var container = $("topRoles");
     container.innerHTML = "";
-
     results.top3.forEach(function (entry, i) {
       container.appendChild(buildRoleCard(entry.role, {
         rank: i + 1,
@@ -132,10 +198,32 @@
       }));
     });
 
+    renderAlsoFit(results.alsoFit);
     renderBlocked(results.blocked);
+    renderProfileNote(results.profile);
   }
 
-  /** בלוק השקיפות: מה נחסם בתנאי-סף. מוצג רק אם באמת יש מה להציג. */
+  /** תפקידים ייחודיים שהתאימו אך לא נכנסו לשלישייה — כדי לא להסתיר מידע. */
+  function renderAlsoFit(alsoFit) {
+    var host = $("alsoFitBlock");
+    host.innerHTML = "";
+    if (!alsoFit || alsoFit.length === 0) return;
+
+    var items = alsoFit.map(function (e) {
+      return '<li><strong>' + esc(e.role.name) + "</strong> — <span>" +
+             e.matchPct + "% התאמה · " + esc(e.role.category) + "</span></li>";
+    }).join("");
+
+    var box = document.createElement("div");
+    box.className = "alsofit-block";
+    box.innerHTML =
+      "<h3>גם התאימו לך</h3>" +
+      "<p>תפקידים ייחודיים שקיבלו התאמה טובה. ההמלצות למעלה מתמקדות בתפקידי הליבה, " +
+      "שהם עיקר התקנים — אך גם אלה פתוחים בפניך.</p>" +
+      '<ul class="alsofit-list">' + items + "</ul>";
+    host.appendChild(box);
+  }
+
   function renderBlocked(blocked) {
     var host = $("blockedBlock");
     host.innerHTML = "";
@@ -152,16 +240,24 @@
       "<p>לפי התשובות שלך, התפקידים האלה קיבלו התאמה גבוהה אך לא עמדו בתנאי-סף. " +
       "זו הצגה שקופה של המצב — לא הבטחה ולא פסילה סופית.</p>" +
       '<ul class="blocked-list">' + items + "</ul>";
-
     host.appendChild(box);
   }
 
-  // ── כרטיס תפקיד (משותף לתוצאות ולקטלוג) ─────────────────────────────────
+  /** אזור המגורים נאסף אך אינו משפיע על הדירוג — נאמר את זה במפורש. */
+  function renderProfileNote(profile) {
+    var host = $("profileNote");
+    host.innerHTML = "";
+    if (!profile || !profile.region) return;
 
-  /**
-   * options: { rank, matchPct, reasons, highlight }
-   * כל השדות אופציונליים — בקטלוג אין דירוג, אחוז או נימוקים.
-   */
+    var p = document.createElement("p");
+    p.className = "profile-note";
+    p.textContent = "אזור המגורים שציינת: " + profile.region +
+      " — השיבוץ בפועל ומיקום היחידה נקבעים בתהליך המיון במרכז הגיוס.";
+    host.appendChild(p);
+  }
+
+  // ── כרטיס תפקיד ─────────────────────────────────────────────────────────
+
   function buildRoleCard(role, options) {
     options = options || {};
     var card = document.createElement("article");
@@ -176,6 +272,12 @@
     html += '<div class="role-title">' +
               "<h3>" + esc(role.name) + "</h3>" +
               '<span class="tag">' + esc(role.category) + "</span>";
+
+    // תג שמבדיל תפקיד שנוסף מחוץ למאגר הרשמי מתפקיד שכל עובדותיו מהמאגר.
+    if (role.source === "added") {
+      html += '<span class="tag tag-added" title="תפקיד זה אינו חלק ממאגר השאלות הרשמי; פרטיו המלאים נמסרים במרכז הגיוס">' +
+              "מידע מלא נמסר במרכז הגיוס</span>";
+    }
 
     if (options.rank) {
       html += '<p class="role-oneliner">' + esc(role.oneLiner) + "</p>";
@@ -194,7 +296,6 @@
       html += '<p class="role-oneliner">' + esc(role.oneLiner) + "</p>";
     }
 
-    // "למה זה מתאים לך" — רק בתוצאות, ורק אם יש נימוקים.
     if (options.reasons && options.reasons.length) {
       html += '<div class="why"><h4>למה זה מתאים לך</h4><ul>' +
         options.reasons.map(function (r) {
@@ -205,11 +306,9 @@
 
     html += buildFacts(role);
 
-    var moreId = "more-" + role.id + "-" + (options.rank ? "top" : "cat");
     html += '<div class="more">' +
-              '<button class="more-toggle" type="button" data-more="' + moreId + '" ' +
-              'aria-expanded="false" aria-controls="' + moreId + '">קרא/י עוד ▾</button>' +
-              '<div class="more-body" id="' + moreId + '">' +
+              '<button class="more-toggle" type="button" aria-expanded="false">קרא/י עוד ▾</button>' +
+              '<div class="more-body">' +
                 "<h5>על התפקיד</h5><p>" + esc(role.description) + "</p>" +
                 "<h5>יום בחיי</h5><p>" + esc(role.dayInLife) + "</p>" +
               "</div>" +
@@ -234,8 +333,9 @@
   }
 
   /**
-   * עובדות המפתח. כאן נאכף כלל הכנות: אם salary הוא null — מוצג בדיוק
-   * CONFIG.SALARY_UNKNOWN, ואף פעם לא טווח מחושב או משוער.
+   * עובדות המפתח. כאן נאכף כלל הכנות: כל שדה שאין לו ערך ב-KB מוצג בדיוק
+   * כ-CONFIG.SALARY_UNKNOWN, ולעולם לא כמספר משוער. זה נכון גם לתפקידים
+   * שנוספו מחוץ למאגר, שכל שדות העובדות שלהם null במכוון.
    */
   function buildFacts(role) {
     var html = '<dl class="facts">';
@@ -246,17 +346,12 @@
         "</ul></dd></div>";
     }
 
-    html += '<div class="fact"><dt>משך הכשרה</dt><dd' +
-            (role.training ? ">" + esc(role.training) : ' class="is-unknown">' + esc(CONFIG.SALARY_UNKNOWN)) +
-            "</dd></div>";
-
-    html += '<div class="fact"><dt>שכר</dt><dd' +
-            (role.salary ? ">" + esc(role.salary) : ' class="is-unknown">' + esc(CONFIG.SALARY_UNKNOWN)) +
-            "</dd></div>";
-
-    html += '<div class="fact"><dt>מסלול התקדמות</dt><dd' +
-            (role.advancement ? ">" + esc(role.advancement) : ' class="is-unknown">' + esc(CONFIG.SALARY_UNKNOWN)) +
-            "</dd></div>";
+    [["משך הכשרה", role.training], ["שכר", role.salary], ["מסלול התקדמות", role.advancement]]
+      .forEach(function (pair) {
+        html += '<div class="fact"><dt>' + pair[0] + "</dt><dd" +
+                (pair[1] ? ">" + esc(pair[1]) : ' class="is-unknown">' + esc(CONFIG.SALARY_UNKNOWN)) +
+                "</dd></div>";
+      });
 
     return html + "</dl>";
   }
@@ -267,7 +362,6 @@
     var host = $("catalogFilters");
     host.innerHTML = "";
 
-    // רק קטגוריות שבאמת מיוצגות ב-KB, בסדר התצוגה שהוגדר ב-roles.js.
     var present = CATEGORIES.filter(function (cat) {
       return ROLES.some(function (r) { return r.category === cat; });
     });
@@ -314,7 +408,7 @@
   // ── איפוס ───────────────────────────────────────────────────────────────
 
   function restart() {
-    state.index = 0;
+    state.questionId = null;
     state.answers = {};
     state.results = null;
     $("progressFill").style.width = "0%";
@@ -323,10 +417,6 @@
 
   // ── שכבת הסבר AI (רשות, כבויה כברירת מחדל) ──────────────────────────────
 
-  /**
-   * מנסח מחדש את בלוק ההסבר בלבד. הדירוג, האחוזים והעובדות כבר מוצגים ולא
-   * משתנים. אם ה-proxy לא זמין — לא קורה כלום והנימוקים המתבניתיים נשארים.
-   */
   function enhanceWithAI(results) {
     var payload = {
       answers: results.top3.map(function (entry) {
@@ -360,13 +450,12 @@
           var why = card && card.querySelector(".why");
           if (!why) return;
           var p = document.createElement("p");
-          p.style.cssText = "margin:9px 0 0;font-size:13.5px;color:#475569;line-height:1.6;";
+          p.className = "why-ai";
           p.textContent = text;
           why.appendChild(p);
         });
       })
       .catch(function () {
-        // נפילה בחן: הנימוקים הדטרמיניסטיים כבר על המסך.
         if (CONFIG.DEBUG) console.warn("שכבת ההסבר של ה-AI אינה זמינה — ממשיכים במצב דטרמיניסטי.");
       });
   }
@@ -378,30 +467,19 @@
     $("resultsDisclaimer").textContent = CONFIG.DISCLAIMER;
 
     $("btnStart").addEventListener("click", function () {
-      state.index = 0;
+      var list = activeQuestions();
+      state.questionId = list[0].id;
       renderQuestion();
       showScreen("quiz");
     });
 
     $("btnNext").addEventListener("click", goNext);
     $("btnBack").addEventListener("click", goBack);
-
     $("btnRestart").addEventListener("click", restart);
     $("btnRestartTop").addEventListener("click", restart);
-
     $("btnCatalogTop").addEventListener("click", openCatalog);
     $("btnCatalogFromResults").addEventListener("click", openCatalog);
     $("btnCatalogBack").addEventListener("click", function () { showScreen(state.returnScreen); });
-
-    // ניווט מקלדת בשאלון: חיצים בין אפשרויות, Enter לאישור.
-    document.addEventListener("keydown", function (e) {
-      if (!$("screen-quiz").classList.contains("is-active")) return;
-
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") return; // RTL — נשאר לדפדפן
-      if (e.key === "Enter" && !$("btnNext").disabled && document.activeElement === document.body) {
-        goNext();
-      }
-    });
   }
 
   document.addEventListener("DOMContentLoaded", init);

@@ -2,10 +2,14 @@
    scoring.js — מנוע הניקוד הדטרמיניסטי.
 
    כל הפונקציות כאן טהורות: הן מקבלות תשובות ומחזירות תוצאה, ואינן נוגעות ב-DOM.
-   זו הסיבה שאפשר להריץ אותן בבדיקות (test/run_checks.js) בלי דפדפן.
+   זו הסיבה שאפשר להריץ אותן בבדיקות (test/) בלי דפדפן.
 
-   הזרימה: answers → profile → earned/maxScore → gates → אחוזים → top3 + blocked.
-   אין כאן שום מקור לעובדות על תפקידים; העובדות כולן ב-data/roles.js.
+   מבנה התשובות: { questionId: [optionId, ...] } — תמיד מערך, גם בשאלת
+   בחירה יחידה, כדי שיהיה מסלול קוד אחד בלבד (תיקון 1: בחירה מרובה).
+
+   הזרימה:
+     answers → profile → שאלות רלוונטיות → earned/maxScore → gates
+             → אחוזים → ניתוב מסלול (ליבה / מנהלה) → top3 + blocked + נימוקים
    --------------------------------------------------------------------------- */
 
 // ── עזרים ──────────────────────────────────────────────────────────────────
@@ -18,48 +22,62 @@ function getQuestion(questionId) {
   return QUESTIONS.find(q => q.id === questionId) || null;
 }
 
-/** מאתר את אובייקט האופציה שנבחרה בשאלה מסוימת. מחזיר null אם לא נענתה. */
-function getSelectedOption(question, answers) {
-  const optionId = answers[question.id];
-  if (optionId == null) return null;
-  return question.options.find(o => o.id === optionId) || null;
+/** מנרמל תשובה לצורת מערך. תומך גם במחרוזת בודדת, למקרה של קלט ישן. */
+function toArray(value) {
+  if (value == null) return [];
+  return Array.isArray(value) ? value.slice() : [value];
+}
+
+/** האופציות שנבחרו בשאלה מסוימת. מערך ריק אם לא נענתה. */
+function getSelectedOptions(question, answers) {
+  const ids = toArray(answers[question.id]);
+  return ids
+    .map(id => question.options.find(o => o.id === id))
+    .filter(Boolean);
 }
 
 function clamp(n, lo, hi) {
   return Math.min(hi, Math.max(lo, n));
 }
 
-// ── 5.1 בניית פרופיל ───────────────────────────────────────────────────────
+// ── בניית פרופיל ───────────────────────────────────────────────────────────
 
 /**
- * ממזג את שדות ה-profile של כל האופציות שנבחרו לאובייקט פרופיל אחד.
- * שאלה אחת = מקור אחד לכל שדה, ולכן אין התנגשות אמיתית בין ערכים מספריים.
- * החריג היחיד הוא hasDegree, שיכול להגיע משתי שאלות (סטטוס ותחום תואר) —
- * שם מספיק ש-אחת מהן סימנה true.
+ * ממזג את שדות ה-profile של כל האופציות שנבחרו.
+ *
+ * דגלים בוליאניים (isStudent, hasDegree, combatCommand…) הם OR: מספיק
+ * שאופציה אחת סימנה true. זה מה שמאפשר למועמד להשתייך לכמה קבוצות בו-זמנית
+ * — סטודנט שהוא גם קצין לשעבר יקבל את שני הדגלים ואת שני המסלולים.
+ *
+ * הפונקציה חייבת להיות בטוחה להרצה על תשובות חלקיות, כי היא נקראת גם
+ * באמצע השאלון כדי להחליט אילו שאלות מותנות להציג.
  */
 function buildProfile(answers) {
   const profile = {};
+  const OR_FLAGS = ["hasDegree", "isStudent", "isGraduate", "isCivilian",
+                    "isExOfficer", "combatCommand", "studyYear", "arabicRefuses"];
 
   QUESTIONS.forEach(question => {
-    const option = getSelectedOption(question, answers);
-    if (!option || !option.profile) return;
-
-    Object.keys(option.profile).forEach(key => {
-      const value = option.profile[key];
-      // hasDegree הוא OR על פני כל התשובות: "אין לי תואר" לא מבטל "בוגר תואר".
-      if (key === "hasDegree") {
-        profile.hasDegree = profile.hasDegree === true || value === true;
-      } else {
-        profile[key] = value;
-      }
+    getSelectedOptions(question, answers).forEach(option => {
+      if (!option.profile) return;
+      Object.keys(option.profile).forEach(key => {
+        const value = option.profile[key];
+        if (OR_FLAGS.indexOf(key) !== -1) {
+          profile[key] = profile[key] === true || value === true;
+        } else {
+          profile[key] = value;
+        }
+      });
     });
   });
 
-  // ברירות מחדל למי שלא ענה על שאלה מסוימת (§5.1).
+  // ברירות מחדל למי שלא הגיע לשאלה או לא ענה עליה.
   if (profile.resilience   == null) profile.resilience   = 2;
   if (profile.arabic       == null) profile.arabic       = 0;
   if (profile.rifleman     == null) profile.rifleman     = 2;
   if (profile.techAffinity == null) profile.techAffinity = 1;
+  if (profile.fitness      == null) profile.fitness      = 1;
+  if (profile.risk         == null) profile.risk         = 1;
   if (profile.hasDegree    == null) profile.hasDegree    = false;
 
   // combat נגזר מרמת הרובאי, לא נשאל ישירות.
@@ -69,44 +87,69 @@ function buildProfile(answers) {
   return profile;
 }
 
-// ── 5.2 ניקוד גולמי ────────────────────────────────────────────────────────
+// ── שאלות רלוונטיות (showIf) ───────────────────────────────────────────────
 
-/** סוכם לכל תפקיד את הנקודות שהתשובות שנבחרו תרמו לו בפועל. */
-function computeEarned(answers) {
+/**
+ * השאלות שצריכות להיות מוצגות בהינתן התשובות עד כה.
+ * שאלה בלי showIf מוצגת תמיד. שאלה מותנית נבדקת מול הפרופיל הנוכחי,
+ * כך שסימון "יש לי תואר" פותח מיד את שאלת תחום הלימודים.
+ */
+function visibleQuestions(answers) {
+  const profile = buildProfile(answers);
+  return QUESTIONS.filter(q => typeof q.showIf !== "function" || q.showIf(profile) === true);
+}
+
+// ── ניקוד גולמי ────────────────────────────────────────────────────────────
+
+/**
+ * סוכם לכל תפקיד את הנקודות שהתשובות תרמו לו.
+ *
+ * בשאלת בחירה מרובה נלקחת התרומה הגבוהה ביותר מבין האופציות שנבחרו — ולא
+ * סכום שלהן. אחרת סימון של כמה אפשרויות היה מנפח את הניקוד באופן מלאכותי
+ * ופוגע בהשוואה בין מועמדים. "מקסימום" מבטא את ההתאמה הטובה ביותר שהמועמד
+ * סימן, וזה גם מה שמייצר מכנה עקבי ב-computeMaxScores.
+ */
+function computeEarned(answers, questions) {
+  const list = questions || visibleQuestions(answers);
   const earned = {};
   ROLES.forEach(role => { earned[role.id] = 0; });
 
-  QUESTIONS.forEach(question => {
-    const option = getSelectedOption(question, answers);
-    if (!option || !option.scores) return;
-
-    Object.keys(option.scores).forEach(roleId => {
-      if (earned[roleId] == null) return; // roleId לא מוכר — נתפס בבדיקות השפיות
-      earned[roleId] += option.scores[roleId];
+  list.forEach(question => {
+    const best = {};
+    getSelectedOptions(question, answers).forEach(option => {
+      Object.keys(option.scores || {}).forEach(roleId => {
+        const pts = option.scores[roleId];
+        if (pts <= 0) return;
+        if (best[roleId] == null || pts > best[roleId]) best[roleId] = pts;
+      });
+    });
+    Object.keys(best).forEach(roleId => {
+      if (earned[roleId] == null) return; // roleId לא מוכר — נתפס בבדיקות
+      earned[roleId] += best[roleId];
     });
   });
 
   return earned;
 }
 
-// ── 5.3 ניקוד מרבי לנרמול ──────────────────────────────────────────────────
+// ── ניקוד מרבי לנרמול ──────────────────────────────────────────────────────
 
 /**
- * לכל תפקיד: סכום התרומה המקסימלית האפשרית מכל שאלה.
- * בשאלה שאף אופציה בה לא נוגעת בתפקיד — התרומה 0, ולכן היא לא מנפחת את המכנה.
- * זה מה שמאפשר לתפקיד נישה להגיע לאחוז גבוה בלי להתחרות על שאלות לא רלוונטיות,
- * ובדיוק בגלל זה נדרש גם סף MIN_EARNED_FOR_RANK (§5.5).
+ * לכל תפקיד: סכום התרומה המקסימלית מכל שאלה שהוצגה בפועל.
+ *
+ * חשוב שהמכנה יחושב על אותן שאלות שהמשתמש ראה. שאלה מותנית שלא הוצגה
+ * (למשל תחום התואר, למי שאין תואר) לא נספרת — אחרת היא הייתה מענישה
+ * את התפקידים שתלויים בה מבלי שלמשתמש הייתה הזדמנות לענות עליה.
  */
-function computeMaxScores() {
+function computeMaxScores(questions) {
+  const list = questions || QUESTIONS;
   const maxScore = {};
   ROLES.forEach(role => { maxScore[role.id] = 0; });
 
-  QUESTIONS.forEach(question => {
+  list.forEach(question => {
     const bestInQuestion = {};
-
     question.options.forEach(option => {
-      if (!option.scores) return;
-      Object.keys(option.scores).forEach(roleId => {
+      Object.keys(option.scores || {}).forEach(roleId => {
         const pts = option.scores[roleId];
         if (pts <= 0) return;
         if (bestInQuestion[roleId] == null || pts > bestInQuestion[roleId]) {
@@ -114,7 +157,6 @@ function computeMaxScores() {
         }
       });
     });
-
     Object.keys(bestInQuestion).forEach(roleId => {
       if (maxScore[roleId] == null) return;
       maxScore[roleId] += bestInQuestion[roleId];
@@ -124,11 +166,11 @@ function computeMaxScores() {
   return maxScore;
 }
 
-// ── 5.4 בדיקת תנאי-סף ──────────────────────────────────────────────────────
+// ── תנאי-סף ────────────────────────────────────────────────────────────────
 
 /**
- * מחזיר { passed, unmet } — האם התפקיד עובר את כל שעריו, ואילו שערים נכשלו.
- * gates ריק ({}) = תמיד עובר. כך תפקידי הליבה לעולם לא נחסמים.
+ * מחזיר { passed, unmet }. gates ריק = תמיד עובר, ולכן תפקידי הליבה
+ * והמנהלה לעולם לא נחסמים ותמיד יש ממה להשלים 3 המלצות.
  */
 function checkGates(role, profile) {
   const gates = role.gates || {};
@@ -147,44 +189,47 @@ function checkGates(role, profile) {
     unmet.push({ gate: "requiresDegree", label: "דורש תואר אקדמי" });
   }
   if (gates.minResilience != null && !(profile.resilience >= gates.minResilience)) {
-    unmet.push({ gate: "minResilience", need: gates.minResilience, label: "דורש רמת חוסן נפשי גבוהה יותר" });
+    unmet.push({ gate: "minResilience", need: gates.minResilience, label: "דורש חוסן נפשי מול מראות קשים" });
   }
   if (gates.minArabic != null && !(profile.arabic >= gates.minArabic)) {
-    unmet.push({ gate: "minArabic", need: gates.minArabic, label: "דורש שליטה בערבית" });
+    unmet.push({ gate: "minArabic", label: "דורש שליטה בערבית" });
   }
-  if (gates.requiresStudent === true && profile.status !== "student") {
+  if (gates.requiresStudent === true && profile.isStudent !== true) {
     unmet.push({ gate: "requiresStudent", label: "מיועד לסטודנטים בלבד" });
   }
-  if (gates.requiresExOfficer === true && profile.status !== "ex_officer") {
+  if (gates.requiresStudyYear === true && profile.studyYear !== true) {
+    unmet.push({ gate: "requiresStudyYear", label: "דורש יתרת לימודים של שנה לפחות" });
+  }
+  if (gates.requiresExOfficer === true && profile.isExOfficer !== true) {
     unmet.push({ gate: "requiresExOfficer", label: "מיועד לבעלי רקע קצונה" });
+  }
+
+  // מסלול אולפן ערבית לא רלוונטי למי שסימן שאינו מעוניין ללמוד ערבית.
+  if (role.id === "arabic_investigator" && profile.arabicRefuses === true) {
+    unmet.push({ gate: "arabicRefuses", label: "סימנת שאינך מעוניין/ת ללמוד ערבית" });
   }
 
   return { passed: unmet.length === 0, unmet };
 }
 
-// ── 5.6 נימוקים ────────────────────────────────────────────────────────────
+// ── נימוקים ────────────────────────────────────────────────────────────────
 
-/**
- * "למה זה מתאים לך" — נגזר אך ורק מהתשובות שנבחרו בפועל.
- * מאתר את השאלות שבהן הבחירה תרמה הכי הרבה לתפקיד, וממיר אותן למשפט
- * בתבנית קבועה. אין כאן ניסוח חופשי ואין הוספת עובדות.
- */
+/** "למה זה מתאים לך" — נגזר אך ורק מהתשובות שנבחרו בפועל. */
 function buildReasons(roleId, answers, limit) {
   const max = limit != null ? limit : CONFIG.MAX_REASONS;
   const contributions = [];
 
-  QUESTIONS.forEach(question => {
-    const option = getSelectedOption(question, answers);
-    if (!option || !option.scores) return;
-    const pts = option.scores[roleId];
-    if (!pts || pts <= 0) return;
-
-    contributions.push({
-      questionId: question.id,
-      questionText: question.text,
-      optionLabel: option.label,
-      points: pts,
-      text: 'בחרת: "' + option.label + '"'
+  visibleQuestions(answers).forEach(question => {
+    getSelectedOptions(question, answers).forEach(option => {
+      const pts = (option.scores || {})[roleId];
+      if (!pts || pts <= 0) return;
+      contributions.push({
+        questionId: question.id,
+        questionText: question.text,
+        optionLabel: option.label,
+        points: pts,
+        text: 'בחרת: "' + option.label + '"'
+      });
     });
   });
 
@@ -192,39 +237,115 @@ function buildReasons(roleId, answers, limit) {
   return contributions.slice(0, max);
 }
 
-// ── 5.5 חישוב מלא, דירוג והשלמה ────────────────────────────────────────────
+// ── ניתוב מסלול ────────────────────────────────────────────────────────────
 
 /**
- * הסף שתפקיד צריך לעבור כדי להיכלל בדירוג.
+ * האם למועמד אין שום אינדיקציה לתפקיד ליבה.
  *
- * הסף (MIN_EARNED_FOR_RANK) קיים כדי שתפקיד נישה, שרק שאלה או שתיים תורמות לו,
- * לא "יקפוץ" ל-100% על סמך מעט מאוד מידע. אבל סף קבוע יוצר תקלה: תפקיד שהניקוד
- * המרבי שלו נמוך מהסף אינו יכול לעבור אותו לעולם — כלומר הוא לא ניתן להמלצה בשום
- * שילוב תשובות. במטריצה הנוכחית זה קורה לשני תפקידים שהניקוד המרבי שלהם 3:
- * "מסלולי קצונה" ו-"מסלול אולפן ערבית".
+ * תפקיד ליבה מחייב שלושה דברים בסיסיים: נכונות למגע עם אזרחים, כשירות
+ * גופנית כלשהי, ורובאי. מי שסימן שלילה בכל השלושה — אין טעם להציע לו סיור
+ * או בילוש; הוא ינותב למנהלה. די באחד מהשלושה כדי להישאר במסלול הליבה,
+ * כדי לא לנתב למנהלה מועמדים שרק מסויגים בנקודה אחת.
+ */
+function isAdminTrack(profile) {
+  const noCitizens = profile.facing != null && profile.facing !== "citizens";
+  const noFitness  = profile.fitness === 0;
+  const noRifleman = profile.rifleman === 0;
+  return noCitizens && noFitness && noRifleman;
+}
+
+function roleTrack(role) {
+  return role.track || "specialist";
+}
+
+// ── חישוב מלא ודירוג ───────────────────────────────────────────────────────
+
+/**
+ * הסף שתפקיד צריך לעבור כדי להיכלל בדירוג, חתוך לפי מה שהוא מסוגל לצבור.
  *
- * במקרה של הקצונה זה סותר במפורש את הדרישה שהמסלול ייפתח לפי סטטוס — קצין לשעבר
- * היה מסמן "קצין/ה לשעבר", עובר את השער, ובכל זאת לא רואה את המסלול שנועד לו.
- *
- * לכן הסף נחתך לפי מה שהתפקיד מסוגל לצבור בפועל. תפקיד כזה ייכלל רק אם המשתמש
- * צבר את מלוא הניקוד האפשרי עבורו — כלומר סימן בדיוק את התשובות שמובילות אליו,
- * ובנוסף עבר את תנאי-הסף. זו דרישה מחמירה יותר, לא מקילה.
+ * הסף מונע מתפקיד נישה לקפוץ ל-100% על סמך מעט מידע. אבל סף קבוע היה הופך
+ * תפקיד שהניקוד המרבי שלו נמוך מהסף לבלתי ניתן להמלצה בשום שילוב תשובות
+ * (כך קרה למסלולי קצונה ולאולפן ערבית). החיתוך הופך את הדרישה למחמירה
+ * יותר במקרים האלה — ניקוד מלא — במקום לחסום לחלוטין.
  */
 function rankThreshold(maxScoreForRole) {
   return Math.min(CONFIG.MIN_EARNED_FOR_RANK, maxScoreForRole);
 }
 
 /**
- * הפונקציה הראשית. מקבלת answers בצורת { questionId: optionId } ומחזירה:
- *   profile   — הפרופיל שנבנה מהתשובות
- *   top3      — התפקידים המובילים (תמיד לפחות 3, ראה "תמיד ממליץ")
- *   blocked   — תפקידים שנחסמו בשער אך היו מקבלים אחוז גבוה (בלוק השקיפות)
- *   all       — כל התפקידים עם הניקוד שלהם, לצורכי דיבוג/קטלוג
+ * בונה את שלוש ההמלצות לפי מדיניות הניתוב.
+ *
+ * המטרה שהוגדרה: להציע בעיקר תפקידי ליבה, ובתוכם בעיקר חוקר/בלש/סייר —
+ * אלא אם אין למועמד שום אינדיקציה לליבה, ואז לנתב למנהלה.
+ *
+ * לכן שתיים משלוש המשבצות שמורות לתפקידי ליבה (בעדיפות ל-primary), והמשבצת
+ * השלישית פתוחה לתפקיד הכי מתאים שנותר — שם נכנסים היחידות המיוחדות, מז"פ
+ * ושאר ההתמחויות. תפקידים ייחודיים שלא נכנסו לא נעלמים: הם מוצגים בבלוק
+ * נפרד ("גם התאימו לך"), כדי שהמדיניות לא תסתיר מהמועמד מידע רלוונטי.
+ */
+function selectTop(ranked, profile) {
+  const N = CONFIG.TOP_N;
+  const picked = [];
+  const taken = new Set();
+
+  const take = entry => {
+    if (!entry || taken.has(entry.id) || picked.length >= N) return;
+    picked.push(entry);
+    taken.add(entry.id);
+  };
+
+  if (isAdminTrack(profile)) {
+    // אין אינדיקציה לליבה — מנהלה תחילה, ואז מה שנותר (בעיקר משל"ט,
+    // שאינו דורש בוחן כושר ולכן נשאר רלוונטי גם כאן).
+    ranked.filter(e => roleTrack(e.role) === "admin").forEach(take);
+    ranked.forEach(take);
+    return { picked, track: "admin" };
+  }
+
+  // מסלול ליבה: שתי משבצות שמורות לליבה.
+  //
+  // הראשונה מובטחת לחוקר/בלש/סייר — הם עיקר התקנים ולכן תמיד יופיע לפחות
+  // אחד מהם. השנייה פתוחה לכל תפקיד ליבה לפי הניקוד, כולל משל"ט וסייר
+  // תנועה. אם שתי המשבצות היו נעולות על הליבה הראשית, משל"ט היה נדחק
+  // כמעט תמיד למשבצת הפתוחה ומפסיד שם להתמחויות — וזה בדיוק מה שהסימולציה
+  // הראתה. החלוקה הזו שומרת על דומיננטיות הליבה הראשית בלי לחנוק את המשל"ט.
+  const core = ranked.filter(e => roleTrack(e.role) === "core");
+  const corePrimary = core.filter(e => e.role.coreTier === "primary");
+
+  take(corePrimary[0]);
+
+  // המשבצת השמורה השנייה: ברירת המחדל היא ליבה ראשית נוספת, ומשל"ט/סייר
+  // תנועה לוקחים אותה רק אם הם מובילים בפער ברור (CORE_SECONDARY_MARGIN).
+  // בלי הפער הזה הליבה המשנית ניצחה כמעט תמיד; עם נעילה מלאה היא כמעט
+  // לא הופיעה. הפער כויל בסימולציה כדי לפגוע ביעד של 80–90% ליבה ראשית.
+  if (picked.length < CONFIG.CORE_MIN_SLOTS) {
+    const nextPrimary = corePrimary.find(e => !taken.has(e.id));
+    const nextSecondary = core.find(e => !taken.has(e.id) && e.role.coreTier !== "primary");
+
+    if (nextPrimary && nextSecondary) {
+      take(nextSecondary.matchPct >= nextPrimary.matchPct + CONFIG.CORE_SECONDARY_MARGIN
+        ? nextSecondary : nextPrimary);
+    } else {
+      take(nextPrimary || nextSecondary);
+    }
+  }
+  core.forEach(e => { if (picked.length < CONFIG.CORE_MIN_SLOTS) take(e); });
+
+  // המשבצת הפתוחה — הכי מתאים מכל מה שנותר.
+  ranked.forEach(take);
+  return { picked, track: "core" };
+}
+
+/**
+ * הפונקציה הראשית. מקבלת answers בצורת { questionId: [optionId, ...] }.
+ * מחזירה profile, top3, blocked, alsoFit (תפקידים ייחודיים שהתאימו אך לא
+ * נכנסו לשלישייה), track, ו-all לצורכי דיבוג ובדיקות.
  */
 function computeResults(answers) {
   const profile = buildProfile(answers);
-  const earned = computeEarned(answers);
-  const maxScore = computeMaxScores();
+  const questions = visibleQuestions(answers);
+  const earned = computeEarned(answers, questions);
+  const maxScore = computeMaxScores(questions);
 
   const all = ROLES.map(role => {
     const gateCheck = checkGates(role, profile);
@@ -243,178 +364,237 @@ function computeResults(answers) {
     };
   });
 
-  // מיון אחיד: אחוז יורד → ניקוד גולמי יורד → priority עולה (נמוך = עדיף).
   const byRank = (a, b) =>
     (b.matchPct - a.matchPct) ||
     (b.earned - a.earned) ||
     (a.role.priority - b.role.priority);
 
-  const candidates = all
-    .filter(entry => entry.passedGates && entry.earned >= rankThreshold(entry.maxScore))
+  const ranked = all
+    .filter(e => e.passedGates && e.earned >= rankThreshold(e.maxScore))
     .sort(byRank);
 
-  // "תמיד ממליץ": אם הסינון השאיר פחות מ-3, משלימים מתפקידי הליבה חסרי-השער.
-  // מציגים להם את האחוז שחושב להם בפועל, גם אם נמוך — בלי לנפח אותו.
-  const top = candidates.slice(0, CONFIG.TOP_N);
-  if (top.length < CONFIG.TOP_N) {
-    const chosen = new Set(top.map(e => e.id));
-    CONFIG.FALLBACK_ROLE_IDS.forEach(roleId => {
-      if (top.length >= CONFIG.TOP_N || chosen.has(roleId)) return;
+  const selection = selectTop(ranked, profile);
+  const picked = selection.picked;
+
+  // "תמיד ממליץ": השלמה מתפקידים חסרי-שער אם משום מה אין 3.
+  if (picked.length < CONFIG.TOP_N) {
+    const taken = new Set(picked.map(e => e.id));
+    const fallback = selection.track === "admin"
+      ? CONFIG.ADMIN_FALLBACK_ROLE_IDS.concat(CONFIG.FALLBACK_ROLE_IDS)
+      : CONFIG.FALLBACK_ROLE_IDS;
+
+    fallback.forEach(roleId => {
+      if (picked.length >= CONFIG.TOP_N || taken.has(roleId)) return;
       const entry = all.find(e => e.id === roleId);
       if (!entry || !entry.passedGates) return;
-      top.push(entry);
-      chosen.add(roleId);
+      picked.push(entry);
+      taken.add(roleId);
     });
   }
 
-  // בלוק השקיפות: מה נחסם, ולמה. הסיבה נלקחת מדרישות ה-KB — לא מנוסחת מחדש.
+  // מדיניות הניתוב קובעת *אילו* תפקידים נבחרים, אבל לא את סדר התצוגה.
+  // בלי המיון הזה השלישייה יכולה לצאת 58% → 35% → 53%, מה שנראה למשתמש
+  // כמו תקלה. המיון מציג אותה בסדר יורד, בלי לשנות את הבחירה עצמה.
+  picked.sort(byRank);
+
+  const chosen = new Set(picked.map(e => e.id));
+
+  // תפקידים ייחודיים שעברו את הסף אך נדחקו ע"י מדיניות הליבה.
+  const alsoFit = ranked
+    .filter(e => !chosen.has(e.id) && roleTrack(e.role) !== "core")
+    .slice(0, CONFIG.ALSO_FIT_MAX)
+    .map(e => ({ role: e.role, id: e.id, matchPct: e.matchPct }));
+
+  // בלוק השקיפות: מה נחסם בתנאי-סף, והסיבה מתוך דרישות ה-KB.
   const blocked = all
-    .filter(entry => !entry.passedGates && entry.matchPct >= CONFIG.BLOCKED_MIN_PCT)
+    .filter(e => !e.passedGates && e.matchPct >= CONFIG.BLOCKED_MIN_PCT)
     .sort(byRank)
-    .map(entry => ({
-      role: entry.role,
-      id: entry.id,
-      matchPct: entry.matchPct,
-      reason: (entry.role.requirements && entry.role.requirements[0]) ||
-              entry.unmetGates.map(g => g.label).join(", "),
-      unmetGates: entry.unmetGates
+    .map(e => ({
+      role: e.role,
+      id: e.id,
+      matchPct: e.matchPct,
+      reason: e.unmetGates.map(g => g.label).join(" · ") ||
+              (e.role.requirements && e.role.requirements[0]) || "",
+      unmetGates: e.unmetGates
     }));
 
-  const top3 = top.map(entry => Object.assign({}, entry, {
-    reasons: buildReasons(entry.id, answers)
+  const top3 = picked.map(e => Object.assign({}, e, {
+    reasons: buildReasons(e.id, answers)
   }));
 
-  return { profile, top3, blocked, all };
+  return { profile, top3, blocked, alsoFit, track: selection.track, all, questions };
 }
 
-// ── 5.7 בדיקות שפיות ───────────────────────────────────────────────────────
+// ── בדיקות שפיות ───────────────────────────────────────────────────────────
 
-/**
- * בדיקות שמאמתות שהמטריצה וה-KB לא יצאו מסנכרון, ושההתנהגות המובטחת נשמרת.
- * רצות רק כש-CONFIG.DEBUG פעיל, ומחזירות רשימת תוצאות כדי שגם הבדיקות
- * מחוץ לדפדפן (test/run_checks.js) יוכלו להשתמש באותו קוד בדיוק.
- */
+/** ממיר מיפוי נוח של תשובות בודדות לצורת המערכים שהמנוע מצפה לה. */
+function asAnswers(map) {
+  const out = {};
+  Object.keys(map).forEach(k => { out[k] = toArray(map[k]); });
+  return out;
+}
+
 function runSanityChecks() {
   const results = [];
   const check = (name, passed, detail) => results.push({ name, passed, detail: detail || "" });
 
-  // 1. כל roleId שמופיע במטריצת הניקוד קיים ב-ROLES.
+  // ── שלמות המטריצה ──
   const knownIds = new Set(ROLES.map(r => r.id));
   const unknownIds = [];
-  QUESTIONS.forEach(question => {
-    question.options.forEach(option => {
-      Object.keys(option.scores || {}).forEach(roleId => {
-        if (!knownIds.has(roleId)) unknownIds.push(question.id + "/" + option.id + " → " + roleId);
-      });
+  QUESTIONS.forEach(q => q.options.forEach(o => {
+    Object.keys(o.scores || {}).forEach(roleId => {
+      if (!knownIds.has(roleId)) unknownIds.push(q.id + "/" + o.id + " → " + roleId);
     });
-  });
+  }));
   check("כל roleId ב-scores קיים ב-ROLES", unknownIds.length === 0, unknownIds.join("; "));
 
-  // 1b. כל שער שמוגדר על תפקיד הוא שער שהמנוע יודע לבדוק.
-  const knownGates = new Set([
-    "minRifleman", "requiresCombat", "requiresCombatCommand", "requiresDegree",
-    "minResilience", "minArabic", "requiresStudent", "requiresExOfficer"
-  ]);
+  const knownGates = new Set(["minRifleman", "requiresCombat", "requiresCombatCommand",
+    "requiresDegree", "minResilience", "minArabic", "requiresStudent",
+    "requiresStudyYear", "requiresExOfficer"]);
   const unknownGates = [];
-  ROLES.forEach(role => {
-    Object.keys(role.gates || {}).forEach(gate => {
-      if (!knownGates.has(gate)) unknownGates.push(role.id + " → " + gate);
-    });
-  });
+  ROLES.forEach(r => Object.keys(r.gates || {}).forEach(g => {
+    if (!knownGates.has(g)) unknownGates.push(r.id + " → " + g);
+  }));
   check("כל שער ב-gates מוכר למנוע", unknownGates.length === 0, unknownGates.join("; "));
 
-  // 1c. תפקידי ברירת המחדל חייבים להיות חסרי שער, אחרת "תמיד ממליץ" יישבר.
-  const gatedFallbacks = CONFIG.FALLBACK_ROLE_IDS.filter(roleId => {
-    const role = getRole(roleId);
-    return !role || Object.keys(role.gates || {}).length > 0;
+  const badTrack = ROLES.filter(r => ["core", "specialist", "admin"].indexOf(roleTrack(r)) === -1).map(r => r.id);
+  check("לכל תפקיד track תקין", badTrack.length === 0, badTrack.join(", "));
+
+  const gatedFallbacks = CONFIG.FALLBACK_ROLE_IDS.concat(CONFIG.ADMIN_FALLBACK_ROLE_IDS)
+    .filter(id => { const r = getRole(id); return !r || Object.keys(r.gates || {}).length > 0; });
+  check("תפקידי ברירת המחדל ללא שער", gatedFallbacks.length === 0, gatedFallbacks.join(", "));
+
+  // ── פרופילים ──
+  const low = asAnswers({
+    status: "civilian", region: "center", rifleman: "r02", environment: "office",
+    fitness: "medium", shifts: "day", public: "backstage", curiosity: "low",
+    resilience: "low", youth: "no", arabic: "none_open", tech_affinity: "low",
+    patience: "low", teamwork: "solo", risk: "low", age: "45_plus", commitment: "flex"
   });
-  check("תפקידי ברירת המחדל ללא שער", gatedFallbacks.length === 0, gatedFallbacks.join("; "));
+  const lowRes = computeResults(low);
+  check("פרופיל ריק מחזיר 3 המלצות", lowRes.top3.length === 3, "התקבלו " + lowRes.top3.length);
+  check("שאלון ללא תשובות מחזיר 3 המלצות", computeResults({}).top3.length === 3);
 
-  // 2. פרופיל "ריק" — התשובות הנמוכות/המסויגות ביותר — עדיין מחזיר 3 המלצות.
-  const lowAnswers = {
-    status: "civilian", rifleman: "r0", degree_field: "none", environment: "mix",
-    fitness: "low", shifts: "day", public: "no", curiosity: "low", resilience: "low",
-    youth: "no", arabic: "none", tech_affinity: "low", patience: "low",
-    teamwork: "solo", risk: "low", age: "45_plus", commitment: "flex"
-  };
-  const lowResult = computeResults(lowAnswers);
-  check("פרופיל ריק מחזיר 3 המלצות", lowResult.top3.length === 3,
-        "התקבלו " + lowResult.top3.length);
+  // ── בחירה מרובה: סטודנט שהוא גם קצין לשעבר ──
+  const both = asAnswers({
+    status: ["student", "ex_officer"], study_left: "year_plus", degree_field: "other",
+    region: "center", rifleman: "r7", environment: ["office", "field"], fitness: "good",
+    shifts: "day", public: "citizens", curiosity: "high", resilience: "high",
+    youth: "open", arabic: "none_open", tech_affinity: "mid", patience: "mid",
+    teamwork: "mix", risk: "mid", age: "25_34", commitment: "studies"
+  });
+  const bothRes = computeResults(both);
+  const bothProfile = bothRes.profile;
+  check("בחירה מרובה: שני הדגלים נדלקו",
+        bothProfile.isStudent === true && bothProfile.isExOfficer === true);
+  const bothOk = bothRes.all.find(e => e.id === "student").passedGates &&
+                 bothRes.all.find(e => e.id === "officer_track").passedGates;
+  check("בחירה מרובה: שני המסלולים נפתחו", bothOk === true);
 
-  // 2b. גם שאלון שלא נענה כלל (אין תשובות בכלל) מחזיר 3 המלצות.
-  const emptyResult = computeResults({});
-  check("שאלון ללא תשובות מחזיר 3 המלצות", emptyResult.top3.length === 3,
-        "התקבלו " + emptyResult.top3.length);
+  // ── יתרת לימודים ──
+  const shortStudy = asAnswers(Object.assign({}, { status: "student", study_left: "less_year",
+    degree_field: "other", region: "center", rifleman: "r02", environment: "office",
+    fitness: "medium", shifts: "day", public: "citizens", curiosity: "mid",
+    resilience: "mid", youth: "open", arabic: "none_open", tech_affinity: "mid",
+    patience: "mid", teamwork: "mix", risk: "mid", age: "18_24", commitment: "studies" }));
+  const shortRes = computeResults(shortStudy);
+  check("סטודנט עם פחות משנה — תקן הסטודנט חסום",
+        shortRes.all.find(e => e.id === "student").passedGates === false);
+  const longStudy = asAnswers(Object.assign({}, JSON.parse(JSON.stringify({})), {
+    status: ["student"], study_left: ["year_plus"], degree_field: ["other"], region: ["center"],
+    rifleman: ["r02"], environment: ["office"], fitness: ["medium"], shifts: ["day"],
+    public: ["citizens"], curiosity: ["mid"], resilience: ["mid"], youth: ["open"],
+    arabic: ["none_open"], tech_affinity: ["mid"], patience: ["mid"], teamwork: ["mix"],
+    risk: ["mid"], age: ["18_24"], commitment: ["studies"] }));
+  check("סטודנט עם שנה ומעלה — תקן הסטודנט נפתח",
+        computeResults(longStudy).all.find(e => e.id === "student").passedGates === true);
 
-  // 3. פרופיל לוחם עילית מחזיר את היחידות המיוחדות בטופ.
-  const eliteAnswers = {
-    status: "civilian", rifleman: "r7", degree_field: "none", environment: "field",
-    fitness: "very_high", shifts: "nights", public: "no", curiosity: "low",
-    resilience: "high", youth: "no", arabic: "none", tech_affinity: "low",
+  // ── שאלות מותנות ──
+  const noDegreeVisible = visibleQuestions(asAnswers({ status: "civilian" })).map(q => q.id);
+  check("ללא תואר — שאלת תחום הלימודים לא מוצגת",
+        noDegreeVisible.indexOf("degree_field") === -1);
+  check("ללא סטודנט — שאלת יתרת הלימודים לא מוצגת",
+        noDegreeVisible.indexOf("study_left") === -1);
+  const gradVisible = visibleQuestions(asAnswers({ status: "graduate" })).map(q => q.id);
+  check("עם תואר — שאלת תחום הלימודים מוצגת",
+        gradVisible.indexOf("degree_field") !== -1);
+  const studentVisible = visibleQuestions(asAnswers({ status: "student" })).map(q => q.id);
+  check("סטודנט — מוצגות גם יתרת לימודים וגם תחום",
+        studentVisible.indexOf("study_left") !== -1 && studentVisible.indexOf("degree_field") !== -1);
+
+  // ── מז"פ וחוסן נפשי (הבאג מהסימולציה) ──
+  const softDegree = asAnswers({
+    status: "graduate", degree_field: "life_sci", region: "center", rifleman: "r02",
+    environment: "lab", fitness: "low", shifts: "day", public: "backstage",
+    curiosity: "high", resilience: "low", youth: "no", arabic: "none_open",
+    tech_affinity: "mid", patience: "mid", teamwork: "solo", risk: "low",
+    age: "25_34", commitment: "long"
+  });
+  const softRes = computeResults(softDegree);
+  const mazapIds = ["forensics_lab", "forensics_scene", "forensics_mobile"];
+  check("חוסן נמוך — אף תפקיד מז\"פ לא מומלץ",
+        softRes.top3.every(e => mazapIds.indexOf(e.id) === -1),
+        softRes.top3.map(e => e.id).join(", "));
+  check("חוסן נמוך — כל תפקידי מז\"פ חסומים",
+        mazapIds.every(id => softRes.all.find(e => e.id === id).passedGates === false));
+
+  // ── ערבית: לא מעוניין ללמוד ──
+  const noArabic = asAnswers(Object.assign({}, { status: "civilian", region: "center",
+    rifleman: "r02", environment: "office", fitness: "medium", shifts: "day",
+    public: "citizens", curiosity: "high", resilience: "mid", youth: "no",
+    arabic: "none_no", tech_affinity: "mid", patience: "mid", teamwork: "mix",
+    risk: "mid", age: "25_34", commitment: "long" }));
+  check("לא מעוניין ללמוד ערבית — מסלול האולפן חסום",
+        computeResults(noArabic).all.find(e => e.id === "arabic_investigator").passedGates === false);
+
+  // ── ניתוב למנהלה ──
+  const adminAnswers = asAnswers({
+    status: "civilian", region: "center", rifleman: "none", environment: "office",
+    fitness: "low", shifts: "day", public: "staff", curiosity: "mid",
+    resilience: "low", youth: "no", arabic: "none_no", tech_affinity: "mid",
+    patience: "mid", teamwork: "solo", risk: "low", age: "35_44", commitment: "long"
+  });
+  const adminRes = computeResults(adminAnswers);
+  check("ללא אזרחים/כושר/רובאי — ניתוב למסלול מנהלה", adminRes.track === "admin");
+  check("מסלול מנהלה — ההמלצות אינן תפקידי שטח",
+        adminRes.top3.every(e => ["admin", "core"].indexOf(roleTrack(e.role)) !== -1 &&
+                                 (roleTrack(e.role) === "admin" || e.id === "dispatcher")),
+        adminRes.top3.map(e => e.id).join(", "));
+  check("מסלול ליבה נשמר כשיש אינדיקציה אחת לפחות",
+        computeResults(low).track === "core");
+
+  // ── דומיננטיות הליבה ──
+  const eliteAnswers = asAnswers({
+    status: "civilian", region: "center", rifleman: "r7", environment: "field",
+    fitness: "very_high", shifts: "nights", public: "backstage", curiosity: "low",
+    resilience: "high", youth: "no", arabic: "none_open", tech_affinity: "low",
     patience: "high", teamwork: "team", risk: "high", age: "18_24", commitment: "long"
-  };
-  const eliteResult = computeResults(eliteAnswers);
-  const eliteIds = eliteResult.top3.map(e => e.id);
-  const eliteHits = ["spu_yasam", "gideonim", "yamam"].filter(id => eliteIds.includes(id));
-  check("פרופיל לוחם עילית מחזיר יס\"מ/גדעונים/ימ\"מ בטופ", eliteHits.length >= 2,
-        "התקבל: " + eliteIds.join(", "));
+  });
+  const eliteRes = computeResults(eliteAnswers);
+  const coreCount = eliteRes.top3.filter(e => roleTrack(e.role) === "core").length;
+  check("לוחם עילית — עדיין לפחות 2 תפקידי ליבה", coreCount >= CONFIG.CORE_MIN_SLOTS,
+        eliteRes.top3.map(e => e.id).join(", "));
+  check("לוחם עילית — היחידות המיוחדות מוצגות בבלוק 'גם התאימו לך'",
+        eliteRes.alsoFit.some(e => ["spu_yasam", "gideonim", "yamam"].indexOf(e.id) !== -1),
+        eliteRes.alsoFit.map(e => e.id).join(", "));
 
-  // 4. השערים חוסמים בפועל — פרופיל בלי רקע קרבי לא מקבל יחידות מיוחדות.
-  const noCombatIds = lowResult.top3.map(e => e.id);
-  const leakedElite = ["spu_yasam", "gideonim", "yamam", "magav_guard"].filter(id => noCombatIds.includes(id));
-  check("פרופיל ללא רקע קרבי לא מקבל יחידות מיוחדות", leakedElite.length === 0,
-        leakedElite.join(", "));
-
-  // 5. סטודנט מקבל את מסלול הסטודנטים; לא-סטודנט לא מקבל אותו.
-  const studentAnswers = Object.assign({}, lowAnswers, { status: "student", commitment: "studies", age: "18_24" });
-  const studentResult = computeResults(studentAnswers);
-  check("סטודנט מקבל את מסלול הסטודנטים",
-        studentResult.top3.some(e => e.id === "student"),
-        studentResult.top3.map(e => e.id).join(", "));
-  check("לא-סטודנט לא מקבל את מסלול הסטודנטים",
-        !lowResult.top3.some(e => e.id === "student"));
-
-  // 6. ערבית: שליטה מלאה פותחת את מפיק השמע, "ללא" חוסמת אותו.
-  const arabicAnswers = Object.assign({}, lowAnswers, { arabic: "native", environment: "office" });
-  const arabicResult = computeResults(arabicAnswers);
-  check("ערבית ברמה גבוהה פותחת את מפיק השמע",
-        arabicResult.all.find(e => e.id === "sigint_audio").passedGates === true);
-  check("ללא ערבית — מפיק שמע חסום",
-        lowResult.all.find(e => e.id === "sigint_audio").passedGates === false);
-
-  // 7. תואר: מז"פ מעבדה נפתח רק עם תואר.
-  const degreeAnswers = Object.assign({}, lowAnswers, { status: "graduate", degree_field: "life_sci" });
-  const degreeResult = computeResults(degreeAnswers);
-  check("תואר פותח את מז\"פ מעבדה",
-        degreeResult.all.find(e => e.id === "forensics_lab").passedGates === true);
-  check("ללא תואר — מז\"פ מעבדה חסום",
-        lowResult.all.find(e => e.id === "forensics_lab").passedGates === false);
-
-  // 8. אף אחוז לא חורג מהטווח, ולכל תפקיד יש maxScore חיובי (אחרת הנרמול חסר משמעות).
-  const badPct = lowResult.all.filter(e => e.matchPct < 0 || e.matchPct > 100).map(e => e.id);
+  // ── תקינות כללית ──
+  const badPct = lowRes.all.filter(e => e.matchPct < 0 || e.matchPct > 100).map(e => e.id);
   check("כל האחוזים בטווח 0–100", badPct.length === 0, badPct.join(", "));
-  const zeroMax = computeMaxScores();
-  const unreachable = ROLES.filter(r => (zeroMax[r.id] || 0) === 0).map(r => r.id);
+  const fullMax = computeMaxScores(QUESTIONS);
+  const unreachable = ROLES.filter(r => (fullMax[r.id] || 0) === 0).map(r => r.id);
   check("לכל תפקיד יש ניקוד מרבי חיובי", unreachable.length === 0, unreachable.join(", "));
-
-  // 9. אף תפקיד אינו "בלתי ניתן להמלצה": חייב להתקיים שילוב תשובות שמדרג אותו.
-  //    זו הבדיקה שתופסת תפקיד שהניקוד המרבי שלו נמוך מסף הדירוג (ראה rankThreshold).
-  const unrankable = ROLES.filter(r => (zeroMax[r.id] || 0) < rankThreshold(zeroMax[r.id] || 0)).map(r => r.id);
+  const unrankable = ROLES.filter(r => (fullMax[r.id] || 0) < rankThreshold(fullMax[r.id] || 0)).map(r => r.id);
   check("כל תפקיד ניתן להמלצה בשילוב תשובות כלשהו", unrankable.length === 0, unrankable.join(", "));
 
-  // 10. קצין לשעבר אכן מקבל את מסלול הקצונה — הדרישה המפורשת של "שערים לפי סטטוס".
-  const officerAnswers = Object.assign({}, lowAnswers, { status: "ex_officer" });
-  const officerResult = computeResults(officerAnswers);
-  check("קצין לשעבר מקבל את מסלול הקצונה",
-        officerResult.top3.some(e => e.id === "officer_track"),
-        officerResult.top3.map(e => e.id).join(", "));
-  check("לא-קצין לא מקבל את מסלול הקצונה",
-        !lowResult.top3.some(e => e.id === "officer_track"));
+  const addedWithFacts = ROLES.filter(r => r.source === "added" &&
+    (r.salary != null || r.training != null || r.advancement != null)).map(r => r.id);
+  check("לתפקידים שנוספו אין נתוני שכר/הכשרה מומצאים",
+        addedWithFacts.length === 0, addedWithFacts.join(", "));
 
   return results;
 }
 
-// מריץ אוטומטית בדפדפן כשמצב הדיבוג פעיל.
 if (typeof window !== "undefined" && typeof CONFIG !== "undefined" && CONFIG.DEBUG) {
   const checks = runSanityChecks();
   const failed = checks.filter(c => !c.passed);
@@ -428,7 +608,8 @@ if (typeof window !== "undefined" && typeof CONFIG !== "undefined" && CONFIG.DEB
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    buildProfile, computeEarned, computeMaxScores, checkGates,
-    buildReasons, computeResults, runSanityChecks, getRole, getQuestion
+    buildProfile, visibleQuestions, computeEarned, computeMaxScores, checkGates,
+    buildReasons, computeResults, runSanityChecks, getRole, getQuestion,
+    isAdminTrack, roleTrack, asAnswers, toArray
   };
 }
