@@ -410,7 +410,9 @@ const ROLES = [
     applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresFieldMatch: ["tech", "engineering"] }
   },
   {
-    id: "student_social_assistant", name: "סטודנט/ית — עוזר/ת לעובד/ת סוציאלי/ת", category: "מנהלה", priority: 35, track: "admin", adminTier: "central", source: "site",
+    // professional ולא central: התפקיד דורש לימודים בתחום מוגדר, ולכן אינו
+    // שער כניסה שנפתח בניסיון כללי כמו משאבי אנוש או הדרכה.
+    id: "student_social_assistant", name: "סטודנט/ית — עוזר/ת לעובד/ת סוציאלי/ת", category: "מנהלה", priority: 35, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "מסלול סטודנטים בתחום הרווחה — סיוע לעובד/ת סוציאלי/ת בארגון.",
     description: "מסלול סטודנטים לבעלי רקע בעבודה סוציאלית, בריאות או מדעי החברה: סיוע לעובד/ת סוציאלי/ת בארגון, במסגרת שעות מותאמות ללימודים. מתאים לסטודנטים המחפשים התנסות מקצועית רלוונטית לתחום הלימודים שלהם.",
     dayInLife: "משמרות מותאמות ללימודים: סיוע בפניות ובליווי, עבודה מול גורמי רווחה בארגון ותיעוד מקצועי.",
