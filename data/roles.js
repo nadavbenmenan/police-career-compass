@@ -12,6 +12,9 @@
    track:    "core" | "specialist" | "admin"  — לאיזה מסלול התפקיד שייך.
    coreTier: "primary" | "secondary"          — רק לתפקידי ליבה. primary =
              חוקר/בלש/סייר, שהם עיקר ההמלצות; secondary = משל"ט/סייר תנועה.
+   adminTier: "central" | "professional"      — רק לתפקידי מנהלה. central =
+             שער כניסה שנפתח בניסיון כללי; professional = דורש הסמכה
+             מקצועית ספציפית, וחסום בשער עד שהמועמד מראה רקע מתאים.
    source:   "kb"   — התפקיד ועובדותיו מגיעים ממאגר השאלות של מרכז הגיוס.
              "site" — התפקיד ועובדותיו מגיעים מדף התפקידים הרשמי
              (police.gov.il/join/professions). התיאור והדרישות אמיתיים,
@@ -286,17 +289,29 @@ const ROLES = [
   // משך הכשרה ומסלול התקדמות, ולכן שלושת השדות האלה null והממשק מציג
   // "נמסר ביום המיון". אין להשלים כאן מספרים משוערים.
   // כל תפקיד כאן מייצג משפחת תפקידים, לא משרה בודדת.
+  //
+  // ── adminTier: "central" מול "professional" ──────────────────────────────
+  // התפקידים כאן אינם שווי-ערך כשער כניסה. חלקם פתוחים למי שמגיע עם ניסיון
+  // כללי ("ניסיון וידע בתחום משאבי אנוש", "ניסיון בהדרכה ועמידה מול קהל"),
+  // ואחרים דורשים **הסמכה מקצועית ספציפית** — תואר במשפטים ורישיון עריכת דין,
+  // מהנדס בניין, תעודת חשבי שכר, תואר בתזונה.
+  //
+  // בלי ההבחנה הזו כולם התחרו על אותן משבצות על סמך אותות גנריים בלבד
+  // (משרד, שעות יום, מול עובדים, ללא כושר) — ואז בוגר מדעי החיים שלא אמר
+  // מילה על תזונה קיבל "הסעדה ותזונה" ב-100% התאמה. שער `requiresFieldMatch`
+  // דורש שתחום הלימודים שהמועמד סימן יתאים לדרישות שהתפקיד עצמו מפרסם, ושער
+  // `requiresVocational` חוסם תפקיד שההסמכה שלו כלל אינה נשאלת בשאלון.
   {
-    id: "admin_welfare", name: "רווחה ועבודה סוציאלית", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_welfare", name: "רווחה ועבודה סוציאלית", category: "מנהלה", priority: 40, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "טיפול רווחתי בשוטרים ובמשפחותיהם — מיצוי זכויות, ליווי נפגעים ומשפחות שכולות.",
     description: "טיפול רווחתי בשוטרי היחידה, ניהול אירועי רווחה, מיצוי זכויות השוטרים וטיפול בנפגעים, ועבודה רווחתית עם משפחות שכולות וגמלאים. המשפחה כוללת גם עובד/ת סוציאלי/ת במחלק משפחה — תכלול הטיפול הרווחתי בחקירות אלימות במשפחה, עבירות מין ועבירות כלפי חסרי ישע — וכן תפקידים במערך בריאות הנפש.",
     dayInLife: "עבודה מול שוטרים ומשפחות: פניות אישיות, ליווי ומיצוי זכויות, תיאום מול גורמי סיוע וטיפול באירועי רווחה.",
     requirements: ["תואר ראשון בעבודה סוציאלית", "ניסיון בתחום עבודת רווחה ו/או בחקירות נוער, חסרי ישע ונפגעי עבירה", "לתפקידי בריאות הנפש — ניסיון בעבודה קלינית"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresDegree: true }
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresDegree: true, requiresFieldMatch: ["health_social"] }
   },
   {
-    id: "admin_hr", name: "משאבי אנוש ופיתוח ארגוני", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_hr", name: "משאבי אנוש ופיתוח ארגוני", category: "מנהלה", priority: 40, track: "admin", adminTier: "central", source: "site",
     oneLiner: "שיבוץ, קידום והכשרת שוטרים — וליווי תהליכים ארגוניים.",
     description: "טיפול בקידום, שיבוץ והכשרת קצינים ושוטרים. המשפחה כוללת גם ייעוץ ארגוני: ליווי תהליכים ארגוניים וייעוץ בנושאי ממשקים בין יחידות, מבנים ארגוניים ופיתוח צוות, הערכת עובדים ומיון כוח אדם באמצעות ראיונות ותהליכי מיון מקצועיים.",
     dayInLife: "עבודת מטה: טיפול בתהליכי שיבוץ וקידום, ליווי יחידות, ראיונות והערכה, ועבודה מול מערכות כוח אדם.",
@@ -305,16 +320,16 @@ const ROLES = [
     applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
   },
   {
-    id: "admin_payroll", name: "שכר, גמלאות וכספים", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_payroll", name: "שכר, גמלאות וכספים", category: "מנהלה", priority: 40, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "חישוב שכר, גמלאות ותקציב — עבודה מדויקת מול מספרים ונהלים.",
     description: "טיפול בשכר ובקצבאות: דיווח וקליטת שינויי שכר ותשלומי גמלאות, אפיון ויישום הסכמי שכר וביצוע תהליכי בקרה. המשפחה כוללת גם תפקידי תקציב וכלכלה — ניתוח כלכלי, הובלת מהלכי התייעלות וניהול תקציבים.",
     dayInLife: "עבודה מדויקת מול מערכות שכר ותקציב: קליטת נתונים, בקרות, יישום הסכמים וטיפול בפניות פרטניות.",
     requirements: ["תעודת קורס חשבי שכר בכיר / הנהלת חשבונות", "תואר אקדמי בכלכלה ו/או מנהל עסקים", "ניסיון בתחום השכר, הגמלאות והמיסוי", "שליטה ביישומי מחשב ובמערכות שכר"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresFieldMatch: ["econ"] }
   },
   {
-    id: "admin_logistics", name: "לוגיסטיקה, מחסנים ואפסנאות", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_logistics", name: "לוגיסטיקה, מחסנים ואפסנאות", category: "מנהלה", priority: 40, track: "admin", adminTier: "central", source: "site",
     oneLiner: "ניהול מלאי, ציוד ותשתיות — התשתית שמאפשרת לכוחות לתפקד.",
     description: "ניהול מלאי ומתן שירות ליחידות קצה, עבודה מול גורמי חוץ ופנים, ופיקוח ובקרה על יחידות בארץ. המשפחה כוללת גם ניהול מחסנים: קבלת מוצרים ופריקתם, ספירות מלאי, קליטת פריטים והזנתם במערכות הממוחשבות ואחריות על תהליכי הרכש.",
     dayInLife: "עבודה מול מלאי וציוד: קליטה וספירה, מענה ליחידות, בקרות ועבודה במערכות ממוחשבות.",
@@ -323,16 +338,16 @@ const ROLES = [
     applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
   },
   {
-    id: "admin_procurement", name: "רכש, מכרזים והתקשרויות", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_procurement", name: "רכש, מכרזים והתקשרויות", category: "מנהלה", priority: 40, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "ניהול מכרזים וחוזים מול ספקים — שילוב של כלכלה, משפט ומשא ומתן.",
     description: "גיבוש, פרסום וניהול התקשרויות מורכבות מול ספקים וחברות; קביעת היבטים מסחריים הכוללים תנאי סף, מנגנון תמחור ופיצוי מוסכם; וביצוע עבודות קניינות וניהול שוטף של התקשרויות במערכות ERP. המשפחה כוללת גם קניינות רכש — הקמת הסכמים, הוצאת הזמנות ומעקב אחר ערבויות וביטוחים.",
     dayInLife: "עבודה מול ספקים ומערכות רכש: הכנת מכרזים, ניתוח הצעות, ניהול משא ומתן ומעקב אחר התקשרויות.",
     requirements: ["תואר אקדמי במנהל עסקים / ראיית חשבון / כלכלה / לוגיסטיקה / משפטים", "ניסיון בעבודה בתחומים הכלכליים", "יכולת ניתוח כלכלית", "שליטה במערכות ERP/SAP"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresDegree: true }
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresDegree: true, requiresFieldMatch: ["econ", "law"] }
   },
   {
-    id: "admin_training", name: "הדרכה והכשרה", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_training", name: "הדרכה והכשרה", category: "מנהלה", priority: 40, track: "admin", adminTier: "central", source: "site",
     oneLiner: "בניית הידע של הארגון — הדרכה, הכשרה ופיתוח סגלי הוראה.",
     description: "ביצוע הדרכות עיוניות ומעשיות, הסמכה והדרכה מקצועית, וניהול ופיקוח על לומדים. המשפחה כוללת גם תכנון הכשרות — תכנון ותיאום הכשרות מקצועיות, פיזור בוגרי הכשרות לפי נתוני תקינה ואיוש, ומיפוי צרכים — וכן פיתוח סגלי הדרכה והנחיית סדנאות במכללה הלאומית לשוטרים.",
     dayInLife: "העברת הדרכות ועמידה מול קהל, בניית חומרי לימוד, ליווי מתלמדים ותכנון מערכי הכשרה.",
@@ -341,25 +356,25 @@ const ROLES = [
     applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
   },
   {
-    id: "admin_legal", name: "משפט ותביעה", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_legal", name: "משפט ותביעה", category: "מנהלה", priority: 40, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "הכנת כתבי אישום וייצוג בבתי משפט — הזרוע המשפטית של האכיפה.",
     description: "הכנת כתבי אישום ובקשות לבתי משפט, כתיבת חוות דעת משפטיות וליטיגציה. המשפחה כוללת גם תפקידי ייעוץ משפטי והתמחות במחלקת הייעוץ המשפטי, ביחידת תביעות תעבורה ובמדור תלונות הציבור.",
     dayInLife: "עבודה משפטית: הכנת תיקים וכתבי אישום, כתיבת חוות דעת והופעה בבית משפט.",
     requirements: ["תואר ראשון במשפטים ורישיון בעריכת דין", "ניסיון בייצוג משפטי בבתי משפט", "ניסיון במשפט פלילי"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresDegree: true }
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresDegree: true, requiresFieldMatch: ["law"] }
   },
   {
-    id: "admin_medical", name: "רפואה ופרא-רפואה", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_medical", name: "רפואה ופרא-רפואה", category: "מנהלה", priority: 40, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "מענה רפואי לשוטרים — מרפאת היחידה, רפואת חירום ושיקום.",
     description: "מתן מענה רפואי בתחומי רפואה תעסוקתית ורפואת חירום וטיפול ראשוני לשוטרי היחידה. המשפחה כוללת פרמדיקים — מטפל בכיר במרפאת היחידה ובפעילות בשטח — ופיזיותרפיסטים, העוסקים בהדרכה מניעתית בחבלות ספורט ובשיקום לאחר טיפולים.",
     dayInLife: "עבודה במרפאת היחידה ובשטח: טיפול רפואי, מעקבים, אפסניה רפואית והדרכות לגורמי רפואה.",
     requirements: ["הכשרה מקצועית בתחום הרפואי (רופא/ה, פרמדיק/ית או פיזיותרפיסט/ית)", "ניסיון מעשי בתחום", "רישיון נהיגה בתוקף"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresVocational: "\u05e8\u05e4\u05d5\u05d0\u05d4 / \u05e4\u05e8\u05d0-\u05e8\u05e4\u05d5\u05d0\u05d4" }
   },
   {
-    id: "admin_media", name: "דוברות, תוכן ומדיה", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_media", name: "דוברות, תוכן ומדיה", category: "מנהלה", priority: 40, track: "admin", adminTier: "central", source: "site",
     oneLiner: "הקול של הארגון החוצה — כתיבה, ניו מדיה ודוברות.",
     description: "כתיבת תכנים לאתר, למדיות החברתיות ולדפוס, ואחריות לניהול התכנים בפלטפורמות השונות. המשפחה כוללת גם ניו מדיה — ניטור ערוצים מקוונים ומענה פנים וחוץ ארגוני — ודוברות בינלאומית: שיווק פעילות המשטרה מול כלי התקשורת בשפות זרות וקיום ראיונות. סביבת עבודה אינטנסיבית ומרובת ממשקים.",
     dayInLife: "כתיבה ועריכת תוכן, ניהול ערוצים מקוונים, מענה בזמן אמת לפניות תקשורת וליווי אירועים.",
@@ -368,40 +383,40 @@ const ROLES = [
     applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
   },
   {
-    id: "admin_facilities", name: "בינוי, תחזוקה ותשתיות", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_facilities", name: "בינוי, תחזוקה ותשתיות", category: "מנהלה", priority: 40, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "תכנון ותחזוקת המבנים והתשתיות — הנדסה בשירות הארגון.",
     description: "ייעוץ ופיקוח הנדסי בתחומי הבינוי, תחזוקת מבנים, הנדסה ותשתיות; תכנון, ביצוע וליווי פרויקטים; תכנון וניהול תקציבי הבינוי; והכנת תוכנית עבודה שנתית בתחום התחזוקה. המשפחה כוללת גם תפקידי חשמלאות מבנים ותחזוקה.",
     dayInLife: "עבודה הנדסית: ליווי פרויקטים בשטח, פיקוח על קבלנים, ניהול תקציב ותכנון תחזוקה.",
     requirements: ["מהנדס/ת או הנדסאי/ת בניין / אדריכלות", "ניסיון בניהול פרויקטים בבינוי ו/או תחזוקת מבנים", "ניסיון בניהול תקציבים ובמשא ומתן מול קבלנים וספקים", "רישיון נהיגה"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresFieldMatch: ["engineering"] }
   },
   {
-    id: "admin_food", name: "הסעדה ותזונה", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_food", name: "הסעדה ותזונה", category: "מנהלה", priority: 40, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "ניהול מערך ההסעדה — מטבחים, בטיחות מזון ותזונה.",
     description: "פיקוח, ניהול ובקרה על מטבח בתצורת הסעדה תפעולית, אחריות על הזמנות ורכש מול ספקים, בדיקת חשבוניות ותעודות משלוח, ופיקוח על תברואה ובטיחות במטבח. המשפחה כוללת גם ייעוץ מקצועי בתחום התזונה והקולינריה, קביעת סטנדרטים תזונתיים ובקרות בטיחות מזון.",
     dayInLife: "עבודה במערך ההסעדה: פיקוח על מטבחים, בקרות תברואה, הזמנות מול ספקים וקביעת תפריטים.",
     requirements: ["ניסיון בניהול מטבח או בתחום התזונה", "ידע במערכות ERP/SRM", "קורסים בתחום תברואה ובטיחות מזון", "לתפקידי תזונה — תואר בתזונה / טכנולוגיית מזון"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresVocational: "\u05ea\u05d6\u05d5\u05e0\u05d4 / \u05e7\u05d5\u05dc\u05d9\u05e0\u05e8\u05d9\u05d4" }
   },
   {
-    id: "admin_tech_support", name: "תקשוב ותמיכה טכנית", category: "מנהלה", priority: 40, track: "admin", source: "site",
+    id: "admin_tech_support", name: "תקשוב ותמיכה טכנית", category: "מנהלה", priority: 40, track: "admin", adminTier: "professional", source: "site",
     oneLiner: "התשתית הטכנולוגית בשטח — קשר, רשת ותמיכה ליחידות.",
     description: "טיפול בתקלות, ביצוע הדרכות ובקרות ומתן שירות בתחום התקשורת והרשת: התקנה ופירוק של ציוד קשר, מערכות כריזה וטלפוניה, ומתן תמיכה באפליקציות ובתוכנות ליחידות השונות. המשפחה כוללת גם תמיכה טכנית במערכות מחשוב ולוגיסטיקה.",
     dayInLife: "עבודה טכנית ביחידות: התקנות, טיפול בתקלות, תמיכה למשתמשים והדרכות.",
     requirements: ["מהנדס/טכנאי/הנדסאי חשמל, אלקטרוניקה או מחשבים", "ניסיון בתחום החומרה, התוכנה, האלקטרוניקה והרשת", "הכרת מערכות ניהול תשתיות ותקשורת", "רישיון נהיגה"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: {}
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresFieldMatch: ["tech", "engineering"] }
   },
   {
-    id: "student_social_assistant", name: "סטודנט/ית — עוזר/ת לעובד/ת סוציאלי/ת", category: "מנהלה", priority: 35, track: "admin", source: "site",
+    id: "student_social_assistant", name: "סטודנט/ית — עוזר/ת לעובד/ת סוציאלי/ת", category: "מנהלה", priority: 35, track: "admin", adminTier: "central", source: "site",
     oneLiner: "מסלול סטודנטים בתחום הרווחה — סיוע לעובד/ת סוציאלי/ת בארגון.",
     description: "מסלול סטודנטים לבעלי רקע בעבודה סוציאלית, בריאות או מדעי החברה: סיוע לעובד/ת סוציאלי/ת בארגון, במסגרת שעות מותאמות ללימודים. מתאים לסטודנטים המחפשים התנסות מקצועית רלוונטית לתחום הלימודים שלהם.",
     dayInLife: "משמרות מותאמות ללימודים: סיוע בפניות ובליווי, עבודה מול גורמי רווחה בארגון ותיעוד מקצועי.",
     requirements: ["לימודים בתחום עבודה סוציאלית / בריאות / מדעי החברה", "יתרת לימודים של שנה לפחות"],
     training: null, salary: null, advancement: null,
-    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresStudent: true, requiresStudyYear: true }
+    applyUrl: "https://www.police.gov.il/join/CandidateForm/jobs", gates: { requiresStudent: true, requiresStudyYear: true, requiresFieldMatch: ["health_social", "social_sci"] }
   }
 ];
 

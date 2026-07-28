@@ -171,8 +171,18 @@ function computeMaxScores(questions) {
 // ── תנאי-סף ────────────────────────────────────────────────────────────────
 
 /**
+ * התווית של תחום לימודים, נשלפת מהשאלון עצמו כדי שלא תיווצר רשימה מקבילה
+ * שתצא מסנכרון. אם המזהה לא נמצא — מוחזר המזהה עצמו.
+ */
+function fieldLabel(fieldId) {
+  const question = QUESTIONS.filter(q => q.id === "degree_field")[0];
+  const option = question && question.options.filter(o => o.id === fieldId)[0];
+  return option ? option.label : fieldId;
+}
+
+/**
  * מחזיר { passed, unmet }. gates ריק = תמיד עובר, ולכן תפקידי הליבה
- * והמנהלה לעולם לא נחסמים ותמיד יש ממה להשלים 3 המלצות.
+ * ותפקידי המנהלה המרכזיים לעולם לא נחסמים ותמיד יש ממה להשלים 3 המלצות.
  */
 function checkGates(role, profile) {
   const gates = role.gates || {};
@@ -204,6 +214,31 @@ function checkGates(role, profile) {
   }
   if (gates.requiresExOfficer === true && profile.isExOfficer !== true) {
     unmet.push({ gate: "requiresExOfficer", label: "מיועד לבעלי רקע קצונה" });
+  }
+
+  // תפקיד שדרישותיו הן הסמכה בתחום מסוים — תואר במשפטים, מהנדס בניין,
+  // תעודת חשבי שכר. בלי השער הזה הוא נבחר על סמך אותות גנריים בלבד (משרד,
+  // שעות יום, מול עובדים) ויכול היה להגיע ל-100% אצל מי שאין לו שום זיקה
+  // לתחום. הרשימה בכל תפקיד נגזרת מהדרישות שהתפקיד עצמו מפרסם.
+  if (Array.isArray(gates.requiresFieldMatch)) {
+    if (gates.requiresFieldMatch.indexOf(profile.degreeField) === -1) {
+      unmet.push({
+        gate: "requiresFieldMatch",
+        need: gates.requiresFieldMatch,
+        label: "דורש רקע אקדמי מתאים: " + gates.requiresFieldMatch.map(fieldLabel).join(" / ")
+      });
+    }
+  }
+
+  // תפקיד שההסמכה שלו כלל אינה נשאלת בשאלון — תואר בתזונה, רישיון רפואי.
+  // אי אפשר לאשר אותו מהתשובות, ולכן הוא לא מומלץ; הוא נשאר בקטלוג ומוצג
+  // בבלוק השקיפות עם הסיבה, במקום להופיע בהתאמה גבוהה בלי בסיס.
+  if (gates.requiresVocational) {
+    unmet.push({
+      gate: "requiresVocational",
+      need: gates.requiresVocational,
+      label: "דורש הכשרה מקצועית ב" + gates.requiresVocational + " — לא נבדק בשאלון"
+    });
   }
 
   // מסלול אולפן ערבית לא רלוונטי למי שסימן שאינו מעוניין ללמוד ערבית.
@@ -299,7 +334,15 @@ function selectTop(ranked, profile, all, byRank) {
   if (isAdminTrack(profile)) {
     // אין אינדיקציה לליבה — מנהלה תחילה, ואז מה שנותר (בעיקר משל"ט,
     // שאינו דורש בוחן כושר ולכן נשאר רלוונטי גם כאן).
-    ranked.filter(e => roleTrack(e.role) === "admin").forEach(take);
+    //
+    // בתוך המנהלה שמורות משבצות לתפקידים המרכזיים, באותו היגיון שבו שמורות
+    // משבצות לליבה במסלול השני: אלה שערי הכניסה שנפתחים בניסיון כללי, בעוד
+    // תפקיד מקצועי (משפט, בינוי, שכר) רלוונטי רק למי שהגיע עם ההסמכה.
+    const admin = ranked.filter(e => roleTrack(e.role) === "admin");
+    admin.filter(e => e.role.adminTier === "central").forEach(e => {
+      if (picked.length < CONFIG.ADMIN_MIN_CENTRAL_SLOTS) take(e);
+    });
+    admin.forEach(take);
     ranked.forEach(take);
     return { picked, track: "admin" };
   }
@@ -463,7 +506,8 @@ function runSanityChecks() {
 
   const knownGates = new Set(["minRifleman", "requiresCombat", "requiresCombatCommand",
     "requiresDegree", "minResilience", "minArabic", "requiresStudent",
-    "requiresStudyYear", "requiresExOfficer"]);
+    "requiresStudyYear", "requiresExOfficer", "requiresFieldMatch",
+    "requiresVocational"]);
   const unknownGates = [];
   ROLES.forEach(r => Object.keys(r.gates || {}).forEach(g => {
     if (!knownGates.has(g)) unknownGates.push(r.id + " → " + g);
@@ -635,9 +679,11 @@ function runSanityChecks() {
     { name: "רווחה",     answers: { work_value: "help_people", work_object: "people",    work_reward: "helped" },     expect: "admin_welfare",       degree: "health_social" },
     { name: "הדרכה",     answers: { work_value: "learning",    work_object: "people",    work_reward: "taught" },     expect: "admin_training" },
     { name: "לוגיסטיקה", answers: { work_value: "order",       work_object: "equipment", work_reward: "ran_smooth" }, expect: "admin_logistics" },
-    { name: "שכר",       answers: { work_value: "analysis",    work_object: "numbers",   work_reward: "unblocked" },  expect: "admin_payroll" },
+    // שני התפקידים הבאים הם מקצועיים, ולכן הם רלוונטיים רק למי שהגיע עם
+    // הרקע שהתפקיד עצמו דורש — תואר בכלכלה לשכר, ורקע טכנולוגי לתקשוב.
+    { name: "שכר",       answers: { work_value: "analysis",    work_object: "numbers",   work_reward: "unblocked" },  expect: "admin_payroll",      degree: "econ" },
     { name: "מדיה",      answers: { work_value: "creativity",  work_object: "documents", work_reward: "created" },    expect: "admin_media" },
-    { name: "תקשוב",     answers: { work_value: "analysis",    work_object: "systems",   work_reward: "ran_smooth" }, expect: "admin_tech_support" }
+    { name: "תקשוב",     answers: { work_value: "analysis",    work_object: "systems",   work_reward: "ran_smooth" }, expect: "admin_tech_support", degree: "tech" }
   ];
   const wrong = [];
   adminCases.forEach(c => {
@@ -656,6 +702,48 @@ function runSanityChecks() {
   })).map(q => q.id);
   check("פרופיל שטח — שאלות ערכי-העבודה לא מוצגות",
         ["work_value", "work_object", "work_reward"].every(id => fieldOnly.indexOf(id) === -1));
+
+  // ── תפקידי מנהלה מקצועיים דורשים רקע מתאים ──
+  // רגרסיה על באג שדווח: בוגר מדעי החיים, שלא נשאל ולא אמר מילה על תזונה,
+  // קיבל "הסעדה ותזונה" בהתאמה 100%. הסיבה הייתה שלתפקיד לא היה שער כלל,
+  // וכל ניקודו הגיע מאותות גנריים של מנהלה (משרד, שעות יום, מול עובדים).
+  const lifeSciAdmin = computeResults(asAnswers(Object.assign({}, adminBase, {
+    status: ["civilian", "graduate"], degree_field: "life_sci",
+    work_value: "order", work_object: "equipment", work_reward: "ran_smooth"
+  })));
+  const lifeSciIds = lifeSciAdmin.top3.map(e => e.id);
+  check("בוגר מדעי החיים לא מקבל הסעדה/רפואה",
+        lifeSciIds.indexOf("admin_food") === -1 && lifeSciIds.indexOf("admin_medical") === -1,
+        lifeSciIds.join(", "));
+
+  // תפקיד שההסמכה שלו כלל אינה נשאלת בשאלון לא יומלץ לאיש — בשום פרופיל.
+  const vocational = ROLES.filter(r => (r.gates || {}).requiresVocational);
+  const vocationalLeaked = vocational.filter(r =>
+    checkGates(r, buildProfile(asAnswers(Object.assign({}, adminBase, {
+      status: ["civilian", "graduate"], degree_field: "life_sci"
+    })))).passed).map(r => r.id);
+  check("תפקידים שדורשים הסמכה שאינה נשאלת — תמיד חסומים",
+        vocational.length > 0 && vocationalLeaked.length === 0, vocationalLeaked.join(", "));
+
+  // ומנגד: שער ההסמכה נפתח למי שכן הגיע עם הרקע הנכון.
+  const engineerAdmin = computeResults(asAnswers(Object.assign({}, adminBase, {
+    status: ["civilian", "graduate"], degree_field: "engineering",
+    work_value: "analysis", work_object: "equipment", work_reward: "ran_smooth"
+  })));
+  check("רקע בהנדסה פותח את בינוי ותשתיות",
+        engineerAdmin.all.filter(e => e.id === "admin_facilities")[0].passedGates);
+
+  // במסלול המנהלה תמיד מוצע לפחות שער כניסה מרכזי אחד.
+  let noCentral = 0;
+  [["econ", "numbers"], ["law", "documents"], ["engineering", "equipment"], ["tech", "systems"]]
+    .forEach(pair => {
+      const r = computeResults(asAnswers(Object.assign({}, adminBase, {
+        status: ["civilian", "graduate"], degree_field: pair[0],
+        work_value: "analysis", work_object: pair[1], work_reward: "unblocked"
+      })));
+      if (!r.top3.some(e => e.role.adminTier === "central")) noCentral++;
+    });
+  check("מסלול מנהלה — תמיד לפחות תפקיד מרכזי אחד", noCentral === 0, noCentral + " חריגים");
 
   // כל התפקידים שמקורם באתר הרשמי חייבים דרישות אמיתיות ולא שדות ריקים.
   const siteNoReq = ROLES.filter(r => r.source === "site" &&
