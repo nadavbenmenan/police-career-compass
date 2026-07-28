@@ -55,7 +55,9 @@ function clamp(n, lo, hi) {
 function buildProfile(answers) {
   const profile = {};
   const OR_FLAGS = ["hasDegree", "isStudent", "isGraduate", "isCivilian",
-                    "isExOfficer", "combatCommand", "studyYear", "arabicRefuses"];
+                    "isExOfficer", "combatCommand", "studyYear", "arabicRefuses",
+                    "wantsField", "wantsOffice", "wantsLab", "wantsControl",
+                    "investigative"];
 
   QUESTIONS.forEach(question => {
     getSelectedOptions(question, answers).forEach(option => {
@@ -283,7 +285,7 @@ function rankThreshold(maxScoreForRole) {
  * ושאר ההתמחויות. תפקידים ייחודיים שלא נכנסו לא נעלמים: הם מוצגים בבלוק
  * נפרד ("גם התאימו לך"), כדי שהמדיניות לא תסתיר מהמועמד מידע רלוונטי.
  */
-function selectTop(ranked, profile) {
+function selectTop(ranked, profile, all, byRank) {
   const N = CONFIG.TOP_N;
   const picked = [];
   const taken = new Set();
@@ -331,6 +333,17 @@ function selectTop(ranked, profile) {
   }
   core.forEach(e => { if (picked.length < CONFIG.CORE_MIN_SLOTS) take(e); });
 
+  // המשבצות השמורות הן הבטחה, לא תוצאה של הדירוג. יש פרופילים נדירים שבהם
+  // רק תפקיד ליבה אחד עובר את סף הדירוג — למשל מי שסימן משרד ועבודה מול
+  // עובדים, אבל גם כושר גבוה ורקע קרבי — ואז שאר תפקידי הליבה נופלים מתחת
+  // לסף ושתי המשבצות מתמלאות בהתמחויות. במקרה כזה משלימים מתפקידי הליבה
+  // חסרי-השער גם אם ניקודם נמוך, ומציגים את האחוז האמיתי שלהם בלי לנפח.
+  if (picked.length < CONFIG.CORE_MIN_SLOTS && all) {
+    all.filter(e => e.passedGates && roleTrack(e.role) === "core")
+       .sort(byRank)
+       .forEach(e => { if (picked.length < CONFIG.CORE_MIN_SLOTS) take(e); });
+  }
+
   // המשבצת הפתוחה — הכי מתאים מכל מה שנותר.
   ranked.forEach(take);
   return { picked, track: "core" };
@@ -373,7 +386,7 @@ function computeResults(answers) {
     .filter(e => e.passedGates && e.earned >= rankThreshold(e.maxScore))
     .sort(byRank);
 
-  const selection = selectTop(ranked, profile);
+  const selection = selectTop(ranked, profile, all, byRank);
   const picked = selection.picked;
 
   // "תמיד ממליץ": השלמה מתפקידים חסרי-שער אם משום מה אין 3.
@@ -577,6 +590,57 @@ function runSanityChecks() {
   check("לוחם עילית — היחידות המיוחדות מוצגות בבלוק 'גם התאימו לך'",
         eliteRes.alsoFit.some(e => ["spu_yasam", "gideonim", "yamam"].indexOf(e.id) !== -1),
         eliteRes.alsoFit.map(e => e.id).join(", "));
+
+  // ── שאלות מבצעיות לא נשאלות ממי שלא רוצה שטח ──
+  const deskOnly = asAnswers({
+    status: "civilian", region: "center", rifleman: "none", environment: "office",
+    fitness: "low", shifts: "day", public: "staff", curiosity: "mid", resilience: "low"
+  });
+  const deskVisible = visibleQuestions(deskOnly).map(q => q.id);
+  check("ללא שטח — לא נשאלת שאלת הסיכון המבצעי",
+        deskVisible.indexOf("risk") === -1);
+  check("ללא שטח — לא נשאלת שאלת התצפיות והמעקבים",
+        deskVisible.indexOf("patience") === -1);
+  check("ללא שטח — מוצגת שאלת אופי העבודה המנהלתית",
+        deskVisible.indexOf("admin_style") !== -1);
+
+  const fieldWanted = asAnswers({ status: "civilian", rifleman: "r02", environment: "field", fitness: "good" });
+  const fieldVisible = visibleQuestions(fieldWanted).map(q => q.id);
+  check("עם שטח — שאלת הסיכון המבצעי כן מוצגת",
+        fieldVisible.indexOf("risk") !== -1);
+  check("עם שטח — שאלת התצפיות כן מוצגת",
+        fieldVisible.indexOf("patience") !== -1);
+
+  // נטייה חקירתית מחזירה את שאלת הסבלנות גם בלי שטח — היא רלוונטית לבלש.
+  const deskCurious = asAnswers({
+    status: "civilian", rifleman: "none", environment: "office",
+    fitness: "low", public: "backstage", curiosity: "high"
+  });
+  const curiousVisible = visibleQuestions(deskCurious).map(q => q.id);
+  check("נטייה חקירתית מחזירה את שאלת התצפיות",
+        curiousVisible.indexOf("patience") !== -1);
+  check("נטייה חקירתית לא מחזירה את שאלת הסיכון המבצעי",
+        curiousVisible.indexOf("risk") === -1);
+
+  // ── תפקידי המנהלה נבדלים זה מזה ──
+  const adminBase = {
+    status: "civilian", region: "center", rifleman: "none", environment: "office",
+    fitness: "low", shifts: "day", public: "staff", curiosity: "mid",
+    resilience: "low", youth: "no", arabic: "none_no", tech_affinity: "mid",
+    teamwork: "mix", age: "35_44", commitment: "long"
+  };
+  const expectedTop = {
+    people: "admin_welfare", teaching: "admin_training",
+    equipment: "admin_logistics", process: "admin_office"
+  };
+  const wrong = [];
+  Object.keys(expectedTop).forEach(style => {
+    const res = computeResults(asAnswers(Object.assign({}, adminBase, { admin_style: style })));
+    if (res.top3[0].id !== expectedTop[style]) {
+      wrong.push(style + " → " + res.top3[0].id + " (צפוי " + expectedTop[style] + ")");
+    }
+  });
+  check("כל אופי מנהלתי מוביל לתפקיד המנהלה הנכון", wrong.length === 0, wrong.join("; "));
 
   // ── תקינות כללית ──
   const badPct = lowRes.all.filter(e => e.matchPct < 0 || e.matchPct > 100).map(e => e.id);

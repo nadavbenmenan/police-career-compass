@@ -71,7 +71,7 @@ const QUESTIONS = [
   {
     id: "rifleman", text: "מה רמת הרובאי / הרקע הקרבי שלך?",
     options: [
-      { id: "none", label: "ללא רובאי כלל / פטור על פי חוק",                profile: { rifleman: 0 }, scores: { dispatcher: 2, admin_office: 2, admin_welfare: 1, admin_logistics: 1, admin_training: 1 } },
+      { id: "none", label: "ללא רובאי כלל / פטור על פי חוק",                profile: { rifleman: 0 }, scores: { dispatcher: 2, admin_office: 1, admin_welfare: 1, admin_logistics: 1, admin_training: 1 } },
       { id: "r02",  label: "רובאי 02",                                      profile: { rifleman: 2 }, scores: { patrol: 1, detective: 1, investigator: 1, dispatcher: 1, traffic_patrol: 1 } },
       { id: "r3",   label: "רובאי 03–04",                                   profile: { rifleman: 4 }, scores: { magav_guard: 2, patrol: 1, detective: 1 } },
       { id: "r5",   label: "רובאי 05–06",                                   profile: { rifleman: 6 }, scores: { spu_yasam: 3, magav_guard: 2, patrol: 1 } },
@@ -84,10 +84,10 @@ const QUESTIONS = [
     hint: "אפשר לבחור יותר מאפשרות אחת.",
     multi: true,
     options: [
-      { id: "field",   label: "שטח דינמי",                    scores: { patrol: 2, detective: 2, spu_yasam: 2, traffic_patrol: 2, forensics_scene: 2, magav_guard: 2, gideonim: 1, eod: 1 } },
-      { id: "office",  label: "משרד",                         scores: { investigator: 2, net_investigator_105: 1, admin_office: 3, admin_logistics: 3, admin_welfare: 2, admin_training: 2, sigint_audio: 1 } },
-      { id: "lab",     label: "מעבדה",                        scores: { forensics_lab: 3, forensics_mobile: 2, traffic_accident: 1 } },
-      { id: "control", label: "מוקד / סביבה טכנולוגית",       scores: { dispatcher: 3, net_investigator_105: 2, tech_cyber: 2, sigint_audio: 2 } }
+      { id: "field",   label: "שטח דינמי",                    profile: { wantsField: true },   scores: { patrol: 2, detective: 2, spu_yasam: 2, traffic_patrol: 2, forensics_scene: 2, magav_guard: 2, gideonim: 1, eod: 1 } },
+      { id: "office",  label: "משרד",                         profile: { wantsOffice: true },  scores: { investigator: 2, net_investigator_105: 1, admin_office: 3, admin_logistics: 3, admin_welfare: 2, admin_training: 2, sigint_audio: 1 } },
+      { id: "lab",     label: "מעבדה",                        profile: { wantsLab: true },     scores: { forensics_lab: 3, forensics_mobile: 2, traffic_accident: 1 } },
+      { id: "control", label: "מוקד / סביבה טכנולוגית",       profile: { wantsControl: true }, scores: { dispatcher: 3, net_investigator_105: 2, tech_cyber: 2, sigint_audio: 2 } }
     ]
   },
   {
@@ -96,7 +96,7 @@ const QUESTIONS = [
       { id: "very_high", label: "גבוהה מאוד — אוהב/ת אתגר פיזי",          profile: { fitness: 3 }, scores: { spu_yasam: 3, gideonim: 3, yamam: 3, magav_guard: 2, forensics_mobile: 2, patrol: 1 } },
       { id: "good",      label: "טובה",                                   profile: { fitness: 2 }, scores: { patrol: 2, detective: 2, traffic_patrol: 2, magav_guard: 1, eod: 1 } },
       { id: "medium",    label: "בינונית",                                profile: { fitness: 1 }, scores: { investigator: 1, forensics_scene: 1, dispatcher: 1 } },
-      { id: "low",       label: "מעדיף/ה תפקיד ללא דרישה גופנית",         profile: { fitness: 0 }, scores: { dispatcher: 3, investigator: 2, forensics_lab: 2, sigint_audio: 2, net_investigator_105: 2, admin_office: 3, admin_logistics: 2, admin_welfare: 2, admin_training: 2 } }
+      { id: "low",       label: "מעדיף/ה תפקיד ללא דרישה גופנית",         profile: { fitness: 0 }, scores: { dispatcher: 3, investigator: 2, forensics_lab: 2, sigint_audio: 2, net_investigator_105: 2, admin_office: 2, admin_logistics: 2, admin_welfare: 2, admin_training: 2 } }
     ]
   },
   {
@@ -117,9 +117,28 @@ const QUESTIONS = [
     ]
   },
   {
+    // מבדילה בין תפקידי המנהלה. בלי השאלה הזו כל תפקידי המנהלה קיבלו ניקוד
+    // כמעט זהה — הם חולקים את אותם דגלים (משרד, ללא כושר, מול עובדים) ולכן
+    // דורגו יחד. כאן המועמד בוחר את **מושא העבודה**: אנשים, ידע, ציוד או
+    // תהליכים — וזה מה שקובע בפועל רווחה מול הדרכה מול אמ"ש מול מנהל.
+    id: "admin_style", text: "בעבודה מנהלתית — מה מדבר אליך יותר?",
+    hint: "השאלה עוזרת להבחין בין תפקידי המנהלה השונים.",
+    showIf: function (profile) {
+      return profile.facing === "staff" || profile.fitness === 0 || profile.rifleman === 0;
+    },
+    options: [
+      // 4 נקודות — זו השאלה שמגדירה את התפקיד, ולכן היא חייבת לגבור על
+      // האותות הגנריים (משרד, ללא כושר, שעות יום) שכל תפקידי המנהלה חולקים.
+      { id: "people",    label: "לדאוג לאנשים — ליווי אישי, סיוע והקשבה",   profile: { adminFocus: "people" },    scores: { admin_welfare: 4, student_social_assistant: 2, admin_training: 1 } },
+      { id: "teaching",  label: "ללמד ולהעביר ידע — הדרכה והכשרה",          profile: { adminFocus: "teaching" },  scores: { admin_training: 4, admin_welfare: 1 } },
+      { id: "equipment", label: "לנהל ציוד, מלאי ותשתיות",                  profile: { adminFocus: "equipment" }, scores: { admin_logistics: 4 } },
+      { id: "process",   label: "לנהל תהליכים, מסמכים וכוח אדם",            profile: { adminFocus: "process" },   scores: { admin_office: 4, admin_logistics: 1 } }
+    ]
+  },
+  {
     id: "curiosity", text: "כמה מדברת אליך 'ירידה לפרטים' וחיבור פאזל מראיות?",
     options: [
-      { id: "high", label: "מאוד — אוהב/ת לפצח ולחקור",                   scores: { investigator: 3, detective: 2, forensics_scene: 2, youth_investigator: 2, child_investigator: 2, traffic_accident: 2, net_investigator_105: 2, forensics_lab: 1, arabic_investigator: 1 } },
+      { id: "high", label: "מאוד — אוהב/ת לפצח ולחקור", profile: { investigative: true }, scores: { investigator: 3, detective: 2, forensics_scene: 2, youth_investigator: 2, child_investigator: 2, traffic_accident: 2, net_investigator_105: 2, forensics_lab: 1, arabic_investigator: 1 } },
       { id: "mid",  label: "בינוני",                                     scores: { investigator: 1, detective: 1 } },
       { id: "low",  label: "פחות — מעדיף/ה פעולה ישירה",                 scores: { patrol: 1, spu_yasam: 1, magav_guard: 1, dispatcher: 1, admin_logistics: 1 } }
     ]
@@ -160,7 +179,14 @@ const QUESTIONS = [
     ]
   },
   {
+    // עבודה סמויה היא עבודת שטח. אין טעם לשאול על תצפיות ומעקבים מי שסימן
+    // שהוא לא רוצה שטח, בלי כושר ובלי רובאי — אלא אם הוא בעל נטייה חקירתית,
+    // שאז זה עדיין רלוונטי לחוקר ולבלש.
     id: "patience", text: "כמה סבלנות יש לך לתצפיות/מעקבים ממושכים ועבודה סמויה?",
+    showIf: function (profile) {
+      return profile.wantsField === true || profile.fitness >= 2 ||
+             profile.rifleman >= 3 || profile.investigative === true;
+    },
     options: [
       { id: "high", label: "גבוהה",   scores: { detective: 3, gideonim: 2, sigint_audio: 1 } },
       { id: "mid",  label: "בינונית", scores: { detective: 1, investigator: 1 } },
@@ -176,7 +202,13 @@ const QUESTIONS = [
     ]
   },
   {
+    // הדוגמה המפורשת: מי שסימן שאינו רוצה שטח לא צריך להישאל על מעצרים
+    // ולוחמה בטרור. השאלה מוצגת רק למי שיש לו אינדיקציה מבצעית כלשהי —
+    // רצון בשטח, כושר טוב ומעלה, או רקע קרבי.
     id: "risk", text: "מה הנכונות שלך לסיכון מבצעי גבוה (מעצרים, לוחמה בטרור)?",
+    showIf: function (profile) {
+      return profile.wantsField === true || profile.fitness >= 2 || profile.rifleman >= 3;
+    },
     options: [
       { id: "high", label: "גבוהה",                                       profile: { risk: 2 }, scores: { spu_yasam: 3, yamam: 3, gideonim: 3, magav_guard: 2, eod: 2, detective: 1 } },
       { id: "mid",  label: "בינונית",                                     profile: { risk: 1 }, scores: { patrol: 1, traffic_patrol: 1, detective: 1 } },
